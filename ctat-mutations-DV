@@ -287,7 +287,6 @@ def main():
     if not os.path.exists(ctat_genome_lib_path):
         exit("CTAT_GENOME_LIB at {} not found".format(ctat_genome_lib_path))
     gtf = os.path.join(ctat_genome_lib_path, "ref_annot.gtf")
-    ref_dict = os.path.join(ctat_genome_lib_path, "ref_genome.dict")
     ref_fasta = os.path.join(ctat_genome_lib_path, "ref_genome.fa")
     ref_fasta_index = os.path.join(ctat_genome_lib_path, "ref_genome.fa.fai")
     star_reference = os.path.join(ctat_genome_lib_path, "ref_genome.fa.star.idx")
@@ -388,7 +387,6 @@ def main():
     input_json["variant_filtration_cpu"] = cpu
     input_json["variant_annotation_cpu"] = cpu
     input_json["gtf"] = gtf
-    input_json["ref_dict"] = ref_dict
     input_json["ref_fasta"] = ref_fasta
     input_json["ref_fasta_index"] = ref_fasta_index
     input_json["db_snp_vcf"] = db_snp_vcf
@@ -480,7 +478,7 @@ def main():
 
     input_json_with_prefix = {}
     for key in input_json:
-        input_json_with_prefix["ctat_mutations.{}".format(key)] = input_json[key]
+        input_json_with_prefix["ctat_mutations_DV.{}".format(key)] = input_json[key]
     with open(json_file, "wt") as out:
         out.write(json.dumps(input_json_with_prefix))
     cromwell_args = [
