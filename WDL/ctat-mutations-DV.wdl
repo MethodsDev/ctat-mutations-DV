@@ -304,7 +304,7 @@ workflow ctat_mutations_DV {
             call SplitNCigarLongReads {
                 input:
                 input_bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, mm2.bam, bam]),
-                input_bam_index = select_first([MarkDuplicates.bai, mm2.bai, bai]),
+                input_bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, mm2.bai, bai]),
                 scripts_path = scripts_path,
                 docker = docker,
                 preemptible = preemptible
@@ -332,7 +332,7 @@ workflow ctat_mutations_DV {
         call SplitReads {
             input:
                 input_bam = select_first([SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam]),
-                input_bam_index = select_first([SplitNCigarLongReads.bai, MarkDuplicates.bai, StarAlign.bai, mm2.bai]),
+                input_bam_index = select_first([SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai]),
                 extra_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
                 ref_name = basename(basename(ref_fasta, ".fa"), ".fasta"),
                 extra_fasta_index = CreateFastaIndex.fasta_index,
@@ -390,7 +390,7 @@ workflow ctat_mutations_DV {
         # For Illumina: MarkDuplicates -> DeepVariant (no SplitNCigarReads needed)
         # For PacBio: SplitNCigarLongReads -> flagCorrection -> DeepVariant
         File bam_for_variant_calls = select_first([SplitReads.ref_bam, flagCorrection.bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
-        File bai_for_variant_calls = select_first([SplitReads.ref_bai, flagCorrection.bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, StarAlign.bai, mm2.bai, bai])
+        File bai_for_variant_calls = select_first([SplitReads.ref_bai, flagCorrection.bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
 
         # DeepVariant variant calling workflow with built-in parallelization via sharding
         scatter (shard_idx in range(deepvariant_shards)) {
@@ -468,7 +468,7 @@ workflow ctat_mutations_DV {
                     rna_editing_vcf=rna_editing_vcf,
                     rna_editing_vcf_index=rna_editing_vcf_index,
                     bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
-                    bam_index = select_first([MarkDuplicates.bai, StarAlign.bai, mm2.bai, bai]),
+                    bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
                     include_read_var_pos_annotations=include_read_var_pos_annotations,
                     repeat_mask_bed=repeat_mask_bed,
                     ref_splice_adj_regions_bed=ref_splice_adj_regions_bed,
@@ -528,7 +528,7 @@ workflow ctat_mutations_DV {
                             ref_fasta_index = ref_fasta_index,
                             ref_bed = select_first([ref_bed]),
                             bam=select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
-                            bai=select_first([MarkDuplicates.bai, StarAlign.bai, mm2.bai, bai]),
+                            bai=select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
                             docker = docker,
                             preemptible = preemptible
                     }
@@ -1408,11 +1408,13 @@ task NormalizeBam {
             --normalize_max_cov_level ~{max_coverage} \
             --output_bam ~{output_bam_filename}
 
-        
+        samtools index ~{output_bam_filename}
+
     >>>
 
     output {
         File output_bam = "~{output_bam_filename}"
+        File output_bai = "~{output_bam_filename}.bai"
     }
 
     runtime {
