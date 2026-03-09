@@ -27,7 +27,6 @@ workflow ctat_mutations_DV_Terra_hg19 {
       "ref_bed" : gs_base_url + "/ctat_mutation_lib/refGene.sort.bed.gz",
       "ref_fasta" : gs_base_url + "/ref_genome.fa",
       "ref_fasta_index" : gs_base_url + "/ref_genome.fa.fai",
-      "ref_dict" : gs_base_url + "/ref_genome.dict",
       "cravat_lib_tar_gz" : gs_base_url + "/ctat_mutation_lib/cravat.tar.bz2",
       "db_snp_vcf" : gs_base_url + "/ctat_mutation_lib/dbsnp.vcf.gz",
       "db_snp_vcf_index" : gs_base_url + "/ctat_mutation_lib/dbsnp.vcf.gz.tbi",

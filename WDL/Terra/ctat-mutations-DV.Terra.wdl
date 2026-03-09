@@ -10,8 +10,6 @@ struct Ctat_mutations_config {
   File ref_fasta
   File ref_fasta_index
 
-  File ref_dict
-  
   String genome_version
     
   File cravat_lib_tar_gz
@@ -79,7 +77,6 @@ workflow ctat_mutations_Terra {
       ref_bed = pipe_inputs_config.ref_bed,
       ref_fasta = pipe_inputs_config.ref_fasta,
       ref_fasta_index = pipe_inputs_config.ref_fasta_index,
-      ref_dict = pipe_inputs_config.ref_dict,
       genome_version = pipe_inputs_config.genome_version,
       cravat_lib_tar_gz = pipe_inputs_config.cravat_lib_tar_gz,
       db_snp_vcf = pipe_inputs_config.db_snp_vcf,

@@ -19,7 +19,6 @@ workflow ctat_mutations_DV {
         Boolean merge_extra_fasta = true
 
         # resources - all resources derive from the ctat genome lib.
-        File ref_dict
         File ref_fasta
         File ref_fasta_index
         File? gtf
@@ -137,7 +136,6 @@ workflow ctat_mutations_DV {
         # resources
         ref_fasta:{help:"Path to the reference genome to use in the analysis pipeline."}
         ref_fasta_index:{help:"Index for ref_fasta"}
-        ref_dict:{help:"Sequence dictionary for ref_fasta"}
         gtf:{help:"Annotations GTF."}
 
         intervals:{help:"Intervals file to restrict variant calling to. (eg. exome target list file)"}
@@ -296,7 +294,6 @@ workflow ctat_mutations_DV {
     
     File fasta = select_first([MergeFastas.fasta, ref_fasta])
     File fasta_index = select_first([MergeFastas.fasta_index, ref_fasta_index])
-    File sequence_dict = select_first([MergeFastas.sequence_dict, ref_dict])
 
 
     if( (!vcf_input) && (!variant_ready_bam) ) {
@@ -517,7 +514,6 @@ workflow ctat_mutations_DV {
                         base_name = sample_id,
                         ref_fasta = ref_fasta,
                         ref_fasta_index = ref_fasta_index,
-                        ref_dict = ref_dict,
                         scripts_path=scripts_path,
                         docker = docker,
                         preemptible = preemptible
@@ -530,7 +526,6 @@ workflow ctat_mutations_DV {
                             base_name = sample_id,
                             ref_fasta = ref_fasta,
                             ref_fasta_index = ref_fasta_index,
-                            ref_dict = ref_dict,
                             ref_bed = select_first([ref_bed]),
                             bam=select_first([MarkDuplicates.bam, AddOrReplaceReadGroups.bam, StarAlign.bam, bam]),
                             bai=select_first([MarkDuplicates.bai, AddOrReplaceReadGroups.bai, StarAlign.bai, bai]),
@@ -565,7 +560,6 @@ task FilterCancerVariants {
     input {
         String scripts_path
         File input_vcf
-        File ref_dict
 
         File ref_fasta
         File ref_fasta_index
@@ -622,7 +616,6 @@ task CancerVariantReport {
         File input_vcf
         File bam
         File bai
-        File ref_dict
 
         File ref_fasta
         File ref_fasta_index
@@ -1204,10 +1197,6 @@ task MergeFastas {
     command <<<
         cat ~{ref_fasta} ~{extra_fasta} > ~{name}.fa
         samtools faidx ~{name}.fa
-
-        # Create sequence dictionary using picard (no GATK dependency)
-        picard CreateSequenceDictionary \
-        R=~{name}.fa
     >>>
 
     runtime {
@@ -1222,7 +1211,6 @@ task MergeFastas {
     output {
         File fasta = "~{name}.fa"
         File fasta_index = "~{name}.fa.fai"
-        File sequence_dict = "~{name}.dict"
     }
 }
 
@@ -1238,11 +1226,6 @@ task CreateFastaIndex {
 
         cp ~{input_fasta} ~{fasta_basename}
         samtools faidx ~{fasta_basename}
-
-        # Create sequence dictionary using picard (no GATK dependency)
-        picard CreateSequenceDictionary \
-        R=~{fasta_basename} \
-        O=~{prefix_no_ext}.dict
     >>>
 
     runtime {
@@ -1257,7 +1240,6 @@ task CreateFastaIndex {
     output {
         File fasta = fasta_basename
         File fasta_index = "~{fasta_basename}.fai"
-        File dict = "~{prefix_no_ext}.dict"
     }
 }
 
