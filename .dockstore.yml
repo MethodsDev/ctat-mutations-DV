@@ -1,20 +1,20 @@
 version: 1.2
 workflows:
-   - name: ctat_mutations
+   - name: ctat-mutations-DV
      subclass: WDL
-     primaryDescriptorPath: /WDL/ctat_mutations.wdl
+     primaryDescriptorPath: /WDL/ctat-mutations-DV.wdl
      authors:
          - name: Brian Haas
            email: bhaas@broadinstitute.org
-   - name: hg19_ctat_mutations
+   - name: hg19_ctat-mutations-DV
      subclass: WDL
-     primaryDescriptorPath: /WDL/Terra/ctat_mutations.Terra.hg19.wdl
+     primaryDescriptorPath: /WDL/Terra/ctat-mutations-DV.Terra.hg19.wdl
      authors:
          - name: Brian Haas
            email: bhaas@broadinstitute.org
-   - name: hg38_ctat_mutations
+   - name: hg38_ctat-mutations-DV
      subclass: WDL
-     primaryDescriptorPath: /WDL/Terra/ctat_mutations.Terra.hg38.wdl
+     primaryDescriptorPath: /WDL/Terra/ctat-mutations-DV.Terra.hg38.wdl
      authors:
          - name: Brian Haas
            email: bhaas@broadinstitute.org

@@ -1,9 +1,9 @@
 version 1.0
 
-import "ctat_mutations.Terra.wdl" as CTAT_Mutations_Terra
+import "ctat-mutations-DV.Terra.wdl" as CTAT_Mutations_Terra
 
 
-workflow ctat_mutations_Terra_hg19 {
+workflow ctat_mutations_DV_Terra_hg19 {
 
 
   input {

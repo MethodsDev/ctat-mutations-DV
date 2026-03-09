@@ -3,7 +3,7 @@ version 1.0
 import "subworkflows/annotate_variants.wdl" as VariantAnnotation
 
 
-workflow ctat_mutations {
+workflow ctat_mutations_DV {
     input {
         String sample_id
 
