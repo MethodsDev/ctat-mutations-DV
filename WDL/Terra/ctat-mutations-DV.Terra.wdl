@@ -52,12 +52,11 @@ workflow ctat_mutations_Terra {
     File? intervals
     Boolean is_long_reads = false
     Boolean annotate_variants = true
-    String boosting_method = "none"
     Int? preemptible  
     Ctat_mutations_config pipe_inputs_config
   }
   
-  call CTAT_Mutations_wf.ctat_mutations as CM_wf {
+  call CTAT_Mutations_wf.ctat_mutations_DV as CM_wf {
 
     input:
       docker = docker,
@@ -69,8 +68,7 @@ workflow ctat_mutations_Terra {
 
       intervals = intervals,
       annotate_variants = annotate_variants,
-      boosting_method = boosting_method,
-      
+
       is_long_reads = is_long_reads,
 
       gtf = pipe_inputs_config.gtf,
@@ -98,20 +96,32 @@ workflow ctat_mutations_Terra {
 
 
     output {
-        File? haplotype_caller_vcf = CM_wf.haplotype_caller_vcf
+        # DeepVariant outputs (v5.0.0+)
+        File? deepvariant_vcf = CM_wf.deepvariant_vcf
+        File? deepvariant_vcf_index = CM_wf.deepvariant_vcf_index
+        Array[File]? deepvariant_gvcf = CM_wf.deepvariant_gvcf
+
+        # Variant calling BAM (replaces haplotype_caller_realigned_bam)
+        File? variant_calling_bam = CM_wf.variant_calling_bam
+        File? variant_calling_bai = CM_wf.variant_calling_bai
+
+        # Annotated and filtered VCFs
         File? annotated_vcf = CM_wf.annotated_vcf
         File? filtered_vcf = CM_wf.filtered_vcf
+
+        # Alignment outputs
         File? aligned_bam = CM_wf.aligned_bam
         File? aligned_bai = CM_wf.aligned_bai
-        File? output_log_final =  CM_wf.output_log_final
-        File? output_SJ =  CM_wf.output_SJ
-        File? recalibrated_bam = CM_wf.recalibrated_bam
-        File? recalibrated_bam_index = CM_wf.recalibrated_bam_index
+        File? output_log_final = CM_wf.output_log_final
+        File? output_SJ = CM_wf.output_SJ
+
+        # Cancer variant reports
         File? cancer_igv_report = CM_wf.cancer_igv_report
         File? cancer_variants_tsv = CM_wf.cancer_variants_tsv
         File? cancer_vcf = CM_wf.cancer_vcf
-        File? haplotype_caller_realigned_bam = CM_wf.haplotype_caller_realigned_bam
-        File? haplotype_caller_realigned_bai = CM_wf.haplotype_caller_realigned_bai
+
+        # Single-cell variant reads (if applicable)
+        File? sc_var_reads = CM_wf.sc_var_reads
 
     }
 }

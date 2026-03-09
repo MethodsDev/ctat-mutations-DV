@@ -17,7 +17,6 @@ workflow ctat_mutations_DV_Terra_hg38 {
     File? bai 
     File? intervals
     Boolean annotate_variants = true
-    String boosting_method = "none"
     Boolean is_long_reads = false
     Int? preemptible  
   
@@ -63,7 +62,6 @@ workflow ctat_mutations_DV_Terra_hg38 {
       intervals = intervals,
       annotate_variants = annotate_variants,
       is_long_reads = is_long_reads,
-      boosting_method = boosting_method,
       pipe_inputs_config = pipe_inputs_config,
 
       preemptible = preemptible
@@ -71,20 +69,32 @@ workflow ctat_mutations_DV_Terra_hg38 {
   }
 
  output {
-        File? haplotype_caller_vcf = CM_Terra_wf.haplotype_caller_vcf
+        # DeepVariant outputs (v5.0.0+)
+        File? deepvariant_vcf = CM_Terra_wf.deepvariant_vcf
+        File? deepvariant_vcf_index = CM_Terra_wf.deepvariant_vcf_index
+        Array[File]? deepvariant_gvcf = CM_Terra_wf.deepvariant_gvcf
+
+        # Variant calling BAM (replaces haplotype_caller_realigned_bam)
+        File? variant_calling_bam = CM_Terra_wf.variant_calling_bam
+        File? variant_calling_bai = CM_Terra_wf.variant_calling_bai
+
+        # Annotated and filtered VCFs
         File? annotated_vcf = CM_Terra_wf.annotated_vcf
         File? filtered_vcf = CM_Terra_wf.filtered_vcf
+
+        # Alignment outputs
         File? aligned_bam = CM_Terra_wf.aligned_bam
         File? aligned_bai = CM_Terra_wf.aligned_bai
-        File? output_log_final =  CM_Terra_wf.output_log_final
-        File? output_SJ =  CM_Terra_wf.output_SJ
-        File? recalibrated_bam = CM_Terra_wf.recalibrated_bam
-        File? recalibrated_bam_index = CM_Terra_wf.recalibrated_bam_index
+        File? output_log_final = CM_Terra_wf.output_log_final
+        File? output_SJ = CM_Terra_wf.output_SJ
+
+        # Cancer variant reports
         File? cancer_igv_report = CM_Terra_wf.cancer_igv_report
         File? cancer_variants_tsv = CM_Terra_wf.cancer_variants_tsv
         File? cancer_vcf = CM_Terra_wf.cancer_vcf
-        File? haplotype_caller_realigned_bam = CM_Terra_wf.haplotype_caller_realigned_bam
-        File? haplotype_caller_realigned_bai = CM_Terra_wf.haplotype_caller_realigned_bai
+
+        # Single-cell variant reads (if applicable)
+        File? sc_var_reads = CM_Terra_wf.sc_var_reads
 
  }
 
