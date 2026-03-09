@@ -49,7 +49,7 @@ CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
 docker pull trinityctat/ctat_mutations:latest
 
 # Run with FASTQs
-./ctat_mutations \
+./ctat-mutations-DV \
     --left reads_R1.fastq.gz \
     --right reads_R2.fastq.gz \
     --genome_lib_dir /path/to/ctat_genome_lib \
@@ -57,14 +57,14 @@ docker pull trinityctat/ctat_mutations:latest
     --cpu 16
 
 # Run with BAM input
-./ctat_mutations \
+./ctat-mutations-DV \
     --bam aligned.bam \
     --genome_lib_dir /path/to/ctat_genome_lib \
     --sample_id my_sample \
     --variant_ready_bam
 
 # Enable GPU acceleration (much faster)
-./ctat_mutations \
+./ctat-mutations-DV \
     --left reads_R1.fastq.gz \
     --right reads_R2.fastq.gz \
     --genome_lib_dir /path/to/ctat_genome_lib \
@@ -78,7 +78,7 @@ See the [Wiki](https://github.com/NCIP/ctat-mutations/wiki) for full documentati
 ### Long Read Support (PacBio/ONT)
 
 ```bash
-./ctat_mutations \
+./ctat-mutations-DV \
     --left pacbio_reads.fastq.gz \
     --genome_lib_dir /path/to/ctat_genome_lib \
     --sample_id my_sample \

@@ -8,48 +8,48 @@ all: DV_standard DV_SE_Reads DV_long_reads DV_SE_Reads_singlecell DV_long_reads_
 ## DeepVariant tests
 
 DV_standard:
-	../ctat_mutations --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_standard -O example.DV_standard --star_limitBAMsortRAM 400000000
+	../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_standard -O example.DV_standard --star_limitBAMsortRAM 400000000
 
 DV_standard_single_thread:
-	../ctat_mutations --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_standard.onethread --star_cpu 1 -O example.DV_standard.onethread
+	../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_standard.onethread --star_cpu 1 -O example.DV_standard.onethread
 
 DV_standard_w_intervals:
-	../ctat_mutations --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_standard -O example.DV_standard_w_intervals --intervals __misc_data/intervals.list
+	../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_standard -O example.DV_standard_w_intervals --intervals __misc_data/intervals.list
 
 ## Using single-end reads:
 DV_SE_Reads:
-	../ctat_mutations --left reads_1.fastq.gz --sample_id example.DV_standard_SE -O example.DV_standard_SE
+	../ctat-mutations-DV --left reads_1.fastq.gz --sample_id example.DV_standard_SE -O example.DV_standard_SE
 
 # pretend single cell data, do read extractions:
 DV_SE_Reads_singlecell:
-	../ctat_mutations --left reads_1.fastq.gz --sample_id example.DV_standard_SE -O example.DV_standard_SE.singlecell --is_single_cells
+	../ctat-mutations-DV --left reads_1.fastq.gz --sample_id example.DV_standard_SE -O example.DV_standard_SE.singlecell --is_single_cells
 
 ## Using long reads:
 DV_long_reads:
-	../ctat_mutations --left __misc_data/UHR.pbio.fq.gz --sample_id example.long_reads -O example.long_reads --is_long_reads
+	../ctat-mutations-DV --left __misc_data/UHR.pbio.fq.gz --sample_id example.long_reads -O example.long_reads --is_long_reads
 
 DV_long_reads_singlecell:
-	../ctat_mutations --left __misc_data/UHR.pbio.fq.gz --sample_id example.long_reads -O example.long_reads.singlecell --is_long_reads --is_single_cells
+	../ctat-mutations-DV --left __misc_data/UHR.pbio.fq.gz --sample_id example.long_reads -O example.long_reads.singlecell --is_long_reads --is_single_cells
 
 ## DeepVariant-specific parameters
 DV_with_gvcf:
-	../ctat_mutations --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_gvcf -O example.DV_gvcf --output_gvcf
+	../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_gvcf -O example.DV_gvcf --output_gvcf
 
 DV_custom_thresholds:
-	../ctat_mutations --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_custom -O example.DV_custom --deepvariant_min_gq 30 --deepvariant_min_qual 30 --deepvariant_min_dp 10
+	../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_custom -O example.DV_custom --deepvariant_min_gq 30 --deepvariant_min_qual 30 --deepvariant_min_dp 10
 
 ## Docker
 
 DV_standard_docker:
-	docker run --rm -v `pwd`:/data -v ${CTAT_GENOME_LIB}:/ctat_genome_lib_dir:ro trinityctat/ctat_mutations:5.0.0 /usr/local/src/ctat-mutations/ctat_mutations --left /data/reads_1.fastq.gz --right /data/reads_2.fastq.gz --sample_id example.DV.docker --genome_lib_dir /ctat_genome_lib_dir -O /data/example.DV_standard.Docker
+	docker run --rm -v `pwd`:/data -v ${CTAT_GENOME_LIB}:/ctat_genome_lib_dir:ro trinityctat/ctat_mutations:5.0.0 /usr/local/src/ctat-mutations/ctat-mutations-DV --left /data/reads_1.fastq.gz --right /data/reads_2.fastq.gz --sample_id example.DV.docker --genome_lib_dir /ctat_genome_lib_dir -O /data/example.DV_standard.Docker
 
 DV_standard_docker_latest:
-	docker run --rm -v `pwd`:/data -v ${CTAT_GENOME_LIB}:/ctat_genome_lib_dir:ro trinityctat/ctat_mutations:latest /usr/local/src/ctat-mutations/ctat_mutations --left /data/reads_1.fastq.gz --right /data/reads_2.fastq.gz --sample_id example.DV.docker --genome_lib_dir /ctat_genome_lib_dir -O /data/example.DV_standard.Docker
+	docker run --rm -v `pwd`:/data -v ${CTAT_GENOME_LIB}:/ctat_genome_lib_dir:ro trinityctat/ctat_mutations:latest /usr/local/src/ctat-mutations/ctat-mutations-DV --left /data/reads_1.fastq.gz --right /data/reads_2.fastq.gz --sample_id example.DV.docker --genome_lib_dir /ctat_genome_lib_dir -O /data/example.DV_standard.Docker
 
 ## Singularity
 
 DV_standard_singularity:
-	singularity exec -e -B `pwd`:/data -B ${CTAT_GENOME_LIB}:/ctat_genome_lib_dir:ro ../Docker/ctat_mutations.v5.0.0.simg /usr/local/src/ctat-mutations/ctat_mutations --left /data/reads_1.fastq.gz --right /data/reads_2.fastq.gz --sample_id example.DV.singularity --genome_lib_dir /ctat_genome_lib_dir -O /data/example.DV_standard.Singularity
+	singularity exec -e -B `pwd`:/data -B ${CTAT_GENOME_LIB}:/ctat_genome_lib_dir:ro ../Docker/ctat_mutations.v5.0.0.simg /usr/local/src/ctat-mutations/ctat-mutations-DV --left /data/reads_1.fastq.gz --right /data/reads_2.fastq.gz --sample_id example.DV.singularity --genome_lib_dir /ctat_genome_lib_dir -O /data/example.DV_standard.Singularity
 
 
 ##########################################
@@ -57,13 +57,13 @@ DV_standard_singularity:
 ## (be sure to use the corresponding hg19 or GRCh38 ctat genome lib!!! (or it'll crash)
 
 kickstart_vcf_hg19:
-	../ctat_mutations --bam __misc_data/Aligned.sortedByCoord.out.hg19.bam --vcf __misc_data/variants.hg19.vcf --sample_id example.vcf_hg19 -O example.vcf_hg19
+	../ctat-mutations-DV --bam __misc_data/Aligned.sortedByCoord.out.hg19.bam --vcf __misc_data/variants.hg19.vcf --sample_id example.vcf_hg19 -O example.vcf_hg19
 
 kickstart_vcf_GRCh38:
-	../ctat_mutations --bam __misc_data/Aligned.sortedByCoord.out.GRCh38.bam --vcf __misc_data/variants.GRCh38.vcf.gz --sample_id example.vcf_GRCh38 -O example.vcf_GRCh38
+	../ctat-mutations-DV --bam __misc_data/Aligned.sortedByCoord.out.GRCh38.bam --vcf __misc_data/variants.GRCh38.vcf.gz --sample_id example.vcf_GRCh38 -O example.vcf_GRCh38
 
 kickstart_bam_GRCh38_variant_ready:
-	../ctat_mutations --bam __misc_data/example.vcf_GRCh38.variant_ready.bam --variant_ready_bam --sample_id example.vcf_GRCh38 -O example.bam_GRCh38_variant_ready
+	../ctat-mutations-DV --bam __misc_data/example.vcf_GRCh38.variant_ready.bam --variant_ready_bam --sample_id example.vcf_GRCh38 -O example.bam_GRCh38_variant_ready
 
 
 ####################

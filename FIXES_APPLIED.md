@@ -142,7 +142,7 @@ chardet: 4.0.0
 **Test Command:**
 ```bash
 cd testing/
-../ctat_mutations --left reads_1.fastq.gz --right reads_2.fastq.gz \
+../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz \
     --sample_id example.DV_standard -O example.DV_standard \
     --star_limitBAMsortRAM 400000000
 ```

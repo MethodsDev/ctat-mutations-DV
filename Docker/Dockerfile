@@ -173,7 +173,7 @@ RUN wget -q https://github.com/attractivechaos/k8/releases/download/v${K8_VERSIO
     cp k8-${K8_VERSION}/k8-x86_64-Linux $BIN/k8 && \
     rm -rf k8-${K8_VERSION} k8-${K8_VERSION}.tar.bz2
 
-ENV PATH=/usr/local/src/ctat-mutations/WDL/:$PATH
+ENV PATH=/usr/local/src/ctat-mutations/WDL/:/usr/local/src/ctat-mutations/src/:$PATH
 
 
 ## NCIP CTAT mutations v5.0.0

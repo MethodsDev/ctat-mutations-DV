@@ -904,9 +904,10 @@ task DeepVariant_make_examples {
         Float memory = 8
     }
 
-    # RNA-seq specific: Illumina uses default 6 channels (compatible with RNA model), PacBio uses special params
-    # Default channels: read_base,base_quality,mapping_quality,strand,read_supports_variant,base_differs_from_ref
-    String extra_args = if is_long_reads then "--realign_reads=false --vsc_min_fraction_indels=0.12" else ""
+    # RNA-seq specific: Illumina uses default 6 channels (compatible with RNA model), PacBio uses 9 channels
+    # Default 6 channels: read_base,base_quality,mapping_quality,strand,read_supports_variant,base_differs_from_ref
+    # PacBio adds channel 7 via --add_hp_channel and channels 9,10 via --alt_aligned_pileup=diff_channels for 9 channels total
+    String extra_args = if is_long_reads then "--add_hp_channel --alt_aligned_pileup=diff_channels --realign_reads=false --vsc_min_fraction_indels=0.12" else ""
 
     command <<<
         set -ex
