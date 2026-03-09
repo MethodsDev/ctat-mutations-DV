@@ -1,6 +1,6 @@
 version 1.0
 
-import "../ctat_mutations.wdl" as CTAT_Mutations_wf
+import "../ctat-mutations-DV.wdl" as CTAT_Mutations_wf
 
 
 struct Ctat_mutations_config {
