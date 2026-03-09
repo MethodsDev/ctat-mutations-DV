@@ -1,0 +1,6 @@
+*.simg
+Docker/*.simg
+testing/example.*
+testing/cromwell-executions
+testing/*.log
+testing/__pycache__

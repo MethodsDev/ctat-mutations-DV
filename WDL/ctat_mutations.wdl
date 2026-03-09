@@ -68,10 +68,9 @@ workflow ctat_mutations {
         Boolean variant_ready_bam = false
         Boolean filter_ready_vcf = false
 
-        Boolean apply_bqsr = true
         Boolean mark_duplicates = true
         Boolean add_read_groups = true
-        
+
         Int variant_filtration_cpu = 1
         Int variant_annotation_cpu = 5
 
@@ -79,34 +78,30 @@ workflow ctat_mutations {
 
         Boolean normalize_bam = true
 
-        # boosting
-        String boosting_alg_type = "classifier" #["classifier", "regressor"],
-        String boosting_method = "none" #  ["none", "AdaBoost", "XGBoost", "LR", "NGBoost", "RF", "SGBoost", "SVM_RBF", "SVML"]
-        Boolean boost_indels = false
-
-        # no boosting if long reads!  Not trained for that yet.
-        String boosting_method_use = if (is_long_reads) then "none" else boosting_method
+        # DeepVariant configuration
+        # Using v1.4.0 to match RNA-seq model version (last RNA model update was v1.4.0)
+        Boolean deepvariant_use_gpu = false
+        String deepvariant_docker = "google/deepvariant:1.4.0"
+        String deepvariant_docker_gpu = "google/deepvariant:1.4.0-gpu"
+        Int deepvariant_shards = 18
+        Boolean output_gvcf = false
+        Int deepvariant_min_gq = 18
+        Int deepvariant_min_qual = 20
+        Int deepvariant_min_dp = 5
 
         # annotation options
         Boolean incl_snpEff = true
         Boolean incl_dbsnp = true
         Boolean incl_gnomad = true
         Boolean incl_rna_editing = true
-        Boolean include_read_var_pos_annotations = (boosting_method_use != "none") 
+        Boolean include_read_var_pos_annotations = false
         Boolean incl_repeats = true
         Boolean incl_homopolymers = true
+        Boolean incl_cravat = false  # Disabled due to SQLite locking issues with read-only genome lib mount
         Boolean incl_splice_dist = true
-        Boolean incl_blat_ED = (boosting_method_use != "none")
+        Boolean incl_blat_ED = false
         Boolean incl_cosmic = true
-        Boolean incl_cravat = true
 
-        # variant attributes on which to perform boosting
-        Array[String] boosting_attributes =
-        ["AC","ALT","BaseQRankSum","DJ","DP","ED","Entropy","ExcessHet","FS","Homopolymer","LEN","MLEAF","MMF","QUAL","REF","RPT","RS","ReadPosRankSum","SAO","SOR","TCR","TDM","VAF","VMMF"]
-        # minimum score threshold for boosted variant selection"
-        Float boosting_score_threshold = 0.05
-
-        String gatk_path = "gatk" # assume in path
 
         Float star_extra_disk_space = 30
         Float star_fastq_disk_space_multiplier = 10
@@ -115,11 +110,7 @@ workflow ctat_mutations {
         Float star_memory = 43
         Boolean output_unmapped_reads = false
 
-		String haplotype_caller_xtra_args = ""
-        String haplotype_caller_args = "-dont-use-soft-clipped-bases --stand-call-conf 20 --recover-dangling-heads true " + haplotype_caller_xtra_args
-        String haplotype_caller_args_for_extra_reads = "-dont-use-soft-clipped-bases --stand-call-conf 20 --recover-dangling-heads true " + haplotype_caller_xtra_args
-        Float haplotype_caller_memory = 6.5
-        String sequencing_platform = "ILLUMINA"
+	        String sequencing_platform = "ILLUMINA"
         Int preemptible = 2
         String docker = "trinityctat/ctat_mutations:latest"
         Int variant_scatter_count = 6
@@ -138,9 +129,9 @@ workflow ctat_mutations {
 
         left:{help:"One of the two paired RNAseq samples"}
         right:{help:"One of the two paired RNAseq samples"}
-        bam:{help:"Previously aligned bam file. When VCF is provided, the output from ApplyBQSR should be provided as the bam input."}
+        bam:{help:"Previously aligned bam file."}
         bai:{help:"Previously aligned bam index file"}
-        vcf:{help:"Previously generated vcf file to annotate and filter. When provided, the output from ApplyBQSR should be provided as the bam input."}
+        vcf:{help:"Previously generated vcf file to annotate and filter."}
         sample_id:{help:"Sample id"}
 
         # resources
@@ -183,18 +174,18 @@ workflow ctat_mutations {
         add_read_groups : {help:"Whether to add read groups and sort the bam. Turn off for optimization with prealigned sorted bam with read groups."}
         mark_duplicates : {help:"Whether to mark duplicates"}
         filter_cancer_variants:{help:"Whether to generate cancer VCF file"}
-        annotate_variants:{help:"Whether to annotate the vcf file (needed for boosting)"}
+        annotate_variants:{help:"Whether to annotate the vcf file"}
         filter_variants:{help:"Whether to filter VCF file"}
-        apply_bqsr:{help:"Whether to apply base quality score recalibration"}
-        #        recalibration_plot:{help:"Generate recalibration plot"}
 
         sequencing_platform:{help:"The sequencing platform used to generate the sample"}
         include_read_var_pos_annotations :{help: "Add vcf annotation that requires variant to be at least 6 bases from ends of reads."}
 
-        boosting_method:{help:"Variant calling boosting method", choices:["none", "AdaBoost", "XGBoost", "LR", "NGBoost", "RF", "SGBoost", "SVM_RBF", "SVML"]}
-        boosting_alg_type:{help:"Boosting algorithm type: classifier or regressor", choices:["classifier", "regressor"]}
-        boosting_score_threshold:{help:"Minimum score threshold for boosted variant selection"}
-        boosting_attributes:{help:"Variant attributes on which to perform boosting"}
+        deepvariant_use_gpu:{help:"Use GPU acceleration for DeepVariant call_variants step"}
+        deepvariant_shards:{help:"Number of shards for DeepVariant make_examples parallelization"}
+        output_gvcf:{help:"Output gVCF file in addition to VCF"}
+        deepvariant_min_gq:{help:"Minimum genotype quality (GQ) for DeepVariant filtering. Recommended: 18 for high precision."}
+        deepvariant_min_qual:{help:"Minimum QUAL score for DeepVariant filtering"}
+        deepvariant_min_dp:{help:"Minimum depth (DP) for DeepVariant filtering"}
 
         star_cpu:{help:"STAR aligner number of CPUs"}
         star_memory:{help:"STAR aligner memory"}
@@ -204,7 +195,6 @@ workflow ctat_mutations {
         variant_filtration_cpu:{help:"Number of CPUs for variant filtration task"}
         variant_annotation_cpu:{help:"Number of CPUs for variant annotation task"}
 
-        gatk_path:{help:"Path to GATK"}
         plugins_path:{help:"Path to plugins"}
         scripts_path:{help:"Path to scripts"}
 
@@ -277,7 +267,6 @@ workflow ctat_mutations {
                 sample_id = sample_id,
                 base_name = sample_id + '.sorted',
                 sequencing_platform=sequencing_platform,
-                gatk_path = gatk_path,
                 docker = docker,
                 preemptible = preemptible
         }
@@ -288,7 +277,6 @@ workflow ctat_mutations {
             input:
                 input_bam = select_first([AddOrReplaceReadGroups.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
                 base_name = sample_id + ".dedupped",
-                gatk_path = gatk_path,
                 memory = mark_duplicates_memory,
                 docker = docker,
                 preemptible = preemptible
@@ -301,7 +289,6 @@ workflow ctat_mutations {
                 name = "combined",
                 ref_fasta = ref_fasta,
                 extra_fasta = extra_fasta,
-                gatk_path = gatk_path,
                 docker = docker,
                 preemptible = preemptible
         }
@@ -314,6 +301,8 @@ workflow ctat_mutations {
 
     if( (!vcf_input) && (!variant_ready_bam) ) {
 
+        # For PacBio long reads: use custom SplitNCigarLongReads + flagCorrection
+        # For Illumina: skip SplitNCigarReads (DeepVariant handles internally with split_skip_reads=true)
         if (is_long_reads) {
             call SplitNCigarLongReads {
                 input:
@@ -324,54 +313,11 @@ workflow ctat_mutations {
                 preemptible = preemptible
             }
 
-        }
-
-        if ( !is_long_reads ) {    
-          call SplitNCigarReads {
-            input:
-                input_bam = select_first([MarkDuplicates.bam, AddOrReplaceReadGroups.bam, bam]),
-                input_bam_index = select_first([MarkDuplicates.bai, AddOrReplaceReadGroups.bai, bai]),
-                base_name = sample_id + ".split",
-                ref_fasta = fasta,
-                ref_fasta_index = fasta_index,
-                ref_dict = sequence_dict,
-                gatk_path = gatk_path,
-                memory = split_n_cigar_reads_memory,
-                docker = docker,
-                preemptible = preemptible
-          }
-
-        }
-          
-        if(apply_bqsr && defined(db_snp_vcf) && !is_long_reads ) {
-            call BaseRecalibrator {
+            call flagCorrection {
                 input:
-                    input_bam = select_first([SplitNCigarReads.bam]),
-                    input_bam_index = select_first([SplitNCigarReads.bam_index]),
-                    recal_output_file = sample_id + ".recal_data.csv",
-                    db_snp_vcf = db_snp_vcf,
-                    db_snp_vcf_index = db_snp_vcf_index,
-                #                known_indels_sites = known_indels_sites,
-                #                known_indels_sites_indices = known_indels_sites_indices,
-
-                    ref_fasta = fasta,
-                    ref_fasta_index = fasta_index,
-                    ref_dict = sequence_dict,
-                    gatk_path = gatk_path,
-                    docker = docker,
-                    preemptible = preemptible
-            }
-            call ApplyBQSR {
-                input:
-                    input_bam = select_first([SplitNCigarReads.bam]),
-                    input_bam_index = select_first([SplitNCigarReads.bam_index]),
-                    base_name = sample_id + ".bqsr",
-                    recalibration_report = BaseRecalibrator.recalibration_report,
-                #                recalibration_plot = recalibration_plot,
-                    ref_fasta = fasta,
-                    ref_fasta_index = fasta_index,
-                    ref_dict = sequence_dict,
-                    gatk_path = gatk_path,
+                    input_bam = SplitNCigarLongReads.bam,
+                    input_bam_index = SplitNCigarLongReads.bai,
+                    base_name = sample_id + ".flagCorrected",
                     docker = docker,
                     preemptible = preemptible
             }
@@ -383,14 +329,13 @@ workflow ctat_mutations {
             input:
                 input_fasta = extra_fasta,
                 docker = docker,
-                gatk_path = gatk_path,
                 preemptible = preemptible
         }
 
         call SplitReads {
             input:
-                input_bam = select_first([ApplyBQSR.bam, SplitNCigarReads.bam]),
-                input_bam_index = select_first([ApplyBQSR.bam_index, SplitNCigarReads.bam_index]),
+                input_bam = select_first([SplitNCigarLongReads.bam, MarkDuplicates.bam, AddOrReplaceReadGroups.bam]),
+                input_bam_index = select_first([SplitNCigarLongReads.bai, MarkDuplicates.bai, AddOrReplaceReadGroups.bai]),
                 extra_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
                 ref_name = basename(basename(ref_fasta, ".fa"), ".fasta"),
                 extra_fasta_index = CreateFastaIndex.fasta_index,
@@ -399,18 +344,43 @@ workflow ctat_mutations {
                 preemptible = preemptible
         }
         if(SplitReads.extra_bam_number_of_reads > 0) {
-            call HaplotypeCaller as HaplotypeCallerExtra {
+            # DeepVariant for extra_fasta reads
+            scatter (extra_shard_idx in range(deepvariant_shards)) {
+                call DeepVariant_make_examples as DeepVariant_make_examples_Extra {
+                    input:
+                        input_bam = SplitReads.extra_bam,
+                        input_bam_index = SplitReads.extra_bai,
+                        ref_fasta = select_first([CreateFastaIndex.fasta]),
+                        ref_fasta_index = select_first([CreateFastaIndex.fasta_index]),
+                        sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
+                        task_idx = extra_shard_idx,
+                        num_shards = deepvariant_shards,
+                        intervals = intervals,
+                        is_long_reads = is_long_reads,
+                        docker = deepvariant_docker,
+                        preemptible = preemptible
+                }
+            }
+
+            call DeepVariant_call_variants as DeepVariant_call_variants_Extra {
                 input:
-                    input_bam = SplitReads.extra_bam,
-                    input_bam_index = SplitReads.extra_bai,
-                    base_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
-                    ref_dict = select_first([CreateFastaIndex.dict]),
+                    examples = DeepVariant_make_examples_Extra.examples,
+                    sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
+                    is_long_reads = is_long_reads,
+                    use_gpu = deepvariant_use_gpu,
+                    docker = deepvariant_docker,
+                    docker_gpu = deepvariant_docker_gpu,
+                    preemptible = 0
+            }
+
+            call DeepVariant_postprocess_variants as DeepVariant_postprocess_variants_Extra {
+                input:
+                    call_variants_output = DeepVariant_call_variants_Extra.call_variants_output,
                     ref_fasta = select_first([CreateFastaIndex.fasta]),
                     ref_fasta_index = select_first([CreateFastaIndex.fasta_index]),
-                    extra_args = haplotype_caller_args_for_extra_reads,
-                    gatk_path = gatk_path,
-                    docker = docker,
-                    memory = haplotype_caller_memory,
+                    sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
+                    output_gvcf = output_gvcf,
+                    docker = deepvariant_docker,
                     preemptible = preemptible
             }
         }
@@ -418,92 +388,69 @@ workflow ctat_mutations {
 
 
     if(!vcf_input) {
-        
-        File bam_for_variant_calls = select_first([SplitReads.ref_bam, ApplyBQSR.bam, SplitNCigarReads.bam, SplitNCigarLongReads.bam, bam])
-        File bai_for_variant_calls = select_first([SplitReads.ref_bai, ApplyBQSR.bam_index, SplitNCigarReads.bam_index, SplitNCigarLongReads.bai, bai])
-       
-         if(variant_scatter_count > 1) {
-            call SplitIntervals {
-                input:
-                    ref_fasta = ref_fasta,
-                    ref_fasta_index = ref_fasta_index,
-                    ref_dict=ref_dict,
-                    intervals=intervals,
-                    scatter_count = variant_scatter_count,
-                    docker = docker,
-                    gatk_path = gatk_path,
-                    preemptible = preemptible
-            }
-            scatter (interval in SplitIntervals.interval_files) {
-                call HaplotypeCaller as HaplotypeCallerInterval {
-                    input:
-                        input_bam = bam_for_variant_calls,
-                        input_bam_index = bai_for_variant_calls,
-                        base_name = sample_id,
-                        interval_list = interval,
-                        ref_dict = ref_dict,
-                        ref_fasta = ref_fasta,
-                        extra_args = haplotype_caller_args,
-                        ref_fasta_index = ref_fasta_index,
-                        gatk_path = gatk_path,
-                        docker = docker,
-                        memory = haplotype_caller_memory,
-                        preemptible = preemptible
-                }
-            }
-            call MergeVCFs {
-                input:
-                    input_vcfs = HaplotypeCallerInterval.output_vcf,
-                    input_vcfs_indexes = HaplotypeCallerInterval.output_vcf_index,
-                    output_vcf_name = sample_id + ".vcf.gz",
-                    gatk_path = gatk_path,
-                    docker = docker,
-                    preemptible = preemptible
-            }
-            call MergeRealignedBams {
-                input:
-                    input_bams = HaplotypeCallerInterval.output_realigned_bam,
-                    input_bais = HaplotypeCallerInterval.output_realigned_bai,
-                    output_bam_name = sample_id + ".HC_realigned.bam",
-                    output_bai_name = sample_id + ".HC_realigned.bai",
-                    docker = docker,
-                    preemptible = preemptible
-           }
-        }
-        if(variant_scatter_count <= 1) {
-            call HaplotypeCaller {
+
+        # Determine BAM for variant calling based on read type and preprocessing
+        # For Illumina: MarkDuplicates -> DeepVariant (no SplitNCigarReads needed)
+        # For PacBio: SplitNCigarLongReads -> flagCorrection -> DeepVariant
+        File bam_for_variant_calls = select_first([SplitReads.ref_bam, flagCorrection.bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, AddOrReplaceReadGroups.bam, bam])
+        File bai_for_variant_calls = select_first([SplitReads.ref_bai, flagCorrection.bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, AddOrReplaceReadGroups.bai, bai])
+
+        # DeepVariant variant calling workflow with built-in parallelization via sharding
+        scatter (shard_idx in range(deepvariant_shards)) {
+            call DeepVariant_make_examples {
                 input:
                     input_bam = bam_for_variant_calls,
                     input_bam_index = bai_for_variant_calls,
-                    base_name = sample_id,
-                    ref_dict = ref_dict,
                     ref_fasta = ref_fasta,
-                    extra_args = haplotype_caller_args,
                     ref_fasta_index = ref_fasta_index,
-                    gatk_path = gatk_path,
-                    docker = docker,
-                    memory = haplotype_caller_memory,
+                    sample_name = sample_id,
+                    task_idx = shard_idx,
+                    num_shards = deepvariant_shards,
+                    intervals = intervals,
+                    is_long_reads = is_long_reads,
+                    docker = deepvariant_docker,
                     preemptible = preemptible
             }
         }
 
+        call DeepVariant_call_variants {
+            input:
+                examples = DeepVariant_make_examples.examples,
+                sample_name = sample_id,
+                is_long_reads = is_long_reads,
+                use_gpu = deepvariant_use_gpu,
+                docker = deepvariant_docker,
+                docker_gpu = deepvariant_docker_gpu,
+                preemptible = 0
+        }
+
+        call DeepVariant_postprocess_variants {
+            input:
+                call_variants_output = DeepVariant_call_variants.call_variants_output,
+                ref_fasta = ref_fasta,
+                ref_fasta_index = ref_fasta_index,
+                sample_name = sample_id,
+                output_gvcf = output_gvcf,
+                docker = deepvariant_docker,
+                preemptible = preemptible
+        }
+
         if(!vcf_input && defined(extra_fasta) && SplitReads.extra_bam_number_of_reads > 0) {
-            call MergeVCFs as MergePrimaryAndExtraVCFs { # combine extra vcf with primary vcf for joint annotating and boosting
+            call MergeVCFs as MergePrimaryAndExtraVCFs { # combine extra vcf with primary vcf for joint annotating
                 input:
-                    input_vcfs = select_all([select_first([MergeVCFs.output_vcf, HaplotypeCaller.output_vcf, vcf]), HaplotypeCallerExtra.output_vcf]),
+                    input_vcfs = select_all([DeepVariant_postprocess_variants.vcf, DeepVariant_postprocess_variants_Extra.vcf]),
                     input_vcfs_indexes = [],
                     output_vcf_name = sample_id + ".and.extra.vcf.gz",
-                    gatk_path = gatk_path,
                     docker = docker,
                     preemptible = preemptible
             }
         }
      }
 
-     File variant_vcf = select_first([MergePrimaryAndExtraVCFs.output_vcf, MergeVCFs.output_vcf, HaplotypeCaller.output_vcf, vcf])
-     File variant_vcf_index = select_first([MergePrimaryAndExtraVCFs.output_vcf_index, MergeVCFs.output_vcf_index, HaplotypeCaller.output_vcf_index, vcf_index])
-     File realigned_bam = select_first([MergeRealignedBams.output_realigned_bam, HaplotypeCaller.output_realigned_bam, bam])
-     File realigned_bai = select_first([MergeRealignedBams.output_realigned_bai, HaplotypeCaller.output_realigned_bai, bai])
+     File variant_vcf = select_first([MergePrimaryAndExtraVCFs.output_vcf, DeepVariant_postprocess_variants.vcf, vcf])
+     File variant_vcf_index = select_first([MergePrimaryAndExtraVCFs.output_vcf_index, DeepVariant_postprocess_variants.vcf_index, vcf_index])
+     File realigned_bam = select_first([bam_for_variant_calls, bam])
+     File realigned_bai = select_first([bai_for_variant_calls, bai])
 
      if(annotate_variants && !filter_ready_vcf) {
         call VariantAnnotation.annotate_variants_wf as AnnotateVariants {
@@ -551,25 +498,14 @@ workflow ctat_mutations {
       
       if (filter_variants) {
 
-            String base_name = if (boosting_method_use == "none") then sample_id  else "~{sample_id}.~{boosting_method}-~{boosting_alg_type}"
-
-            call VariantFiltration {
+            call FilterDeepVariantVCF {
                 input:
                     input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
                     input_vcf_index = select_first([AnnotateVariants.vcf_index, variant_vcf_index]),
-                    base_name = base_name,
-                    ref_dict = ref_dict,
-                    ref_fasta = ref_fasta,
-                    ref_fasta_index = ref_fasta_index,
-                    boosting_alg_type = boosting_alg_type,
-                    boosting_method = boosting_method_use,
-                    boost_indels = boost_indels,
-                    boosting_attributes=boosting_attributes,
-                    boosting_score_threshold=boosting_score_threshold,
-                    gatk_path = gatk_path,
-                    scripts_path=scripts_path,
-                    cpu=variant_filtration_cpu,
-                    memory=filter_memory,
+                    base_name = sample_id,
+                    min_gq = deepvariant_min_gq,
+                    min_qual = deepvariant_min_qual,
+                    min_dp = deepvariant_min_dp,
                     docker = docker,
                     preemptible = preemptible
             }
@@ -577,13 +513,12 @@ workflow ctat_mutations {
             if(filter_cancer_variants) {
                 call FilterCancerVariants {
                     input:
-                        input_vcf = select_first([VariantFiltration.vcf, AnnotateVariants.vcf]),
-                        base_name = base_name,
+                        input_vcf = FilterDeepVariantVCF.filtered_vcf,
+                        base_name = sample_id,
                         ref_fasta = ref_fasta,
                         ref_fasta_index = ref_fasta_index,
                         ref_dict = ref_dict,
                         scripts_path=scripts_path,
-                        gatk_path = gatk_path,
                         docker = docker,
                         preemptible = preemptible
                 }
@@ -592,7 +527,7 @@ workflow ctat_mutations {
                     call CancerVariantReport {
                         input:
                             input_vcf = FilterCancerVariants.cancer_vcf,
-                            base_name = base_name,
+                            base_name = sample_id,
                             ref_fasta = ref_fasta,
                             ref_fasta_index = ref_fasta_index,
                             ref_dict = ref_dict,
@@ -608,18 +543,17 @@ workflow ctat_mutations {
     
 
     output {
-        File? haplotype_caller_vcf = variant_vcf
-        File? haplotype_caller_vcf_index = variant_vcf_index
-        File? haplotype_caller_realigned_bam = realigned_bam
-        File? haplotype_caller_realigned_bai = realigned_bai
+        File? deepvariant_vcf = variant_vcf
+        File? deepvariant_vcf_index = variant_vcf_index
+        Array[File]? deepvariant_gvcf = DeepVariant_postprocess_variants.gvcf_files
+        File? variant_calling_bam = realigned_bam
+        File? variant_calling_bai = realigned_bai
         File? annotated_vcf = AnnotateVariants.vcf
-        File? filtered_vcf = VariantFiltration.vcf
+        File? filtered_vcf = FilterDeepVariantVCF.filtered_vcf
         File? aligned_bam = StarAlign.bam
         File? aligned_bai = StarAlign.bai
         File? output_log_final =  StarAlign.output_log_final
         File? output_SJ =  StarAlign.output_SJ
-        File? recalibrated_bam = ApplyBQSR.bam
-        File? recalibrated_bam_index = ApplyBQSR.bam_index
         File? cancer_igv_report = CancerVariantReport.cancer_igv_report
         File? cancer_variants_tsv = FilterCancerVariants.cancer_variants_tsv
         File? cancer_vcf = FilterCancerVariants.cancer_vcf
@@ -633,7 +567,6 @@ task FilterCancerVariants {
         File input_vcf
         File ref_dict
 
-        String gatk_path
         File ref_fasta
         File ref_fasta_index
 
@@ -660,32 +593,13 @@ task FilterCancerVariants {
         ~{base_name}.cancer.groom.filt.vcf \
         ~{base_name}.cancer.vcf
 
-        # Convert filtered VCF file to tab file.
+        # Convert filtered VCF file to tab file using bcftools (no GATK dependency)
+        # Generate header
+        echo -e "CHROM\tPOS\tREF\tALT\tGENE\tDP\tQUAL\tMQ\tclinvar_sig\tTUMOR\tTISSUE\tCOSMIC_ID\tFATHMM\tchasmplus_pval\tvest_pval\tmupit_link" > ~{base_name}.cancer.tsv
 
-        ~{gatk_path} --java-options "-Xmx1500m" \
-        VariantsToTable \
-        -R \
-        ~{ref_fasta} \
-        -V \
-        ~{base_name}.cancer.vcf \
-        -F CHROM \
-        -F POS \
-        -F REF \
-        -F ALT \
-        -F GENE \
-        -F DP \
-        -F QUAL \
-        -F MQ \
-        -F clinvar_sig \
-        -F TUMOR \
-        -F TISSUE \
-        -F COSMIC_ID \
-        -F FATHMM \
-        -F chasmplus_pval \
-        -F vest_pval \
-        -F mupit_link \
-        --lenient \
-        -O ~{base_name}.cancer.tsv
+        # Extract fields with bcftools
+        bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%INFO/GENE\t%INFO/DP\t%QUAL\t%INFO/MQ\t%INFO/clinvar_sig\t%INFO/TUMOR\t%INFO/TISSUE\t%INFO/COSMIC_ID\t%INFO/FATHMM\t%INFO/chasmplus_pval\t%INFO/vest_pval\t%INFO/mupit_link\n' \
+            ~{base_name}.cancer.vcf >> ~{base_name}.cancer.tsv || true
 
     >>>
 
@@ -750,7 +664,6 @@ task MarkDuplicates {
     input {
         File input_bam
         String base_name
-        String gatk_path
         String docker
         Float memory
         Int preemptible
@@ -762,12 +675,12 @@ task MarkDuplicates {
         # monitor_script.sh &
 
 
-        ~{gatk_path} --java-options "-Xmx~{command_mem}m" \
+        java -Xmx~{command_mem}m -jar /usr/local/src/picard.jar \
         MarkDuplicates \
-        --INPUT ~{input_bam} \
-        --OUTPUT ~{base_name}.bam  \
-        --CREATE_INDEX true \
-        --METRICS_FILE ~{base_name}.metrics
+        INPUT=~{input_bam} \
+        OUTPUT=~{base_name}.bam  \
+        CREATE_INDEX=true \
+        METRICS_FILE=~{base_name}.metrics
     >>>
 
     output {
@@ -790,7 +703,6 @@ task AddOrReplaceReadGroups {
         File input_bam
         String sequencing_platform
         String base_name
-        String gatk_path
         String docker
         Int preemptible
         String sample_id
@@ -801,16 +713,15 @@ task AddOrReplaceReadGroups {
         set -e
         # monitor_script.sh &
 
-        ~{gatk_path} --java-options "-Xmx500m" \
-        AddOrReplaceReadGroups \
-        --INPUT ~{input_bam} \
-        --OUTPUT ~{base_name}.sorted.bam \
-        --SORT_ORDER coordinate \
-        --RGID id \
-        --RGLB library \
-        --RGPL ~{sequencing_platform} \
-        --RGPU machine \
-        --RGSM ~{unique_id}
+        picard AddOrReplaceReadGroups \
+        INPUT=~{input_bam} \
+        OUTPUT=~{base_name}.sorted.bam \
+        SORT_ORDER=coordinate \
+        RGID=id \
+        RGLB=library \
+        RGPL=~{sequencing_platform} \
+        RGPU=machine \
+        RGSM=~{unique_id}
 
         samtools index "~{base_name}.sorted.bam"
     >>>
@@ -828,97 +739,6 @@ task AddOrReplaceReadGroups {
     }
 }
 
-task BaseRecalibrator {
-    input {
-        File input_bam
-        File input_bam_index
-        String recal_output_file
-        File? db_snp_vcf
-        File? db_snp_vcf_index
-        #        File known_indels_sites
-        #        File known_indels_sites_indices
-        File ref_dict
-        File ref_fasta
-        File ref_fasta_index
-        String gatk_path
-        String docker
-        Int preemptible
-    }
-
-    output {
-        File recalibration_report = recal_output_file
-    }
-    command <<<
-        set -e
-        # monitor_script.sh &
-
-
-        ~{gatk_path} --java-options "-Xmx3500m" \
-        BaseRecalibrator \
-        -R ~{ref_fasta} \
-        -I ~{input_bam} \
-        --use-original-qualities \
-        --maximum-cycle-value 20000 \
-        -O ~{recal_output_file} \
-        -known-sites ~{db_snp_vcf}
-
-    >>>
-    runtime {
-        memory: "4G"
-        disks: "local-disk " + ceil((size(input_bam, "GB") * 3) + 30) + " HDD"
-        docker: docker
-        preemptible: preemptible
-    }
-
-}
-
-task ApplyBQSR {
-    input {
-        File input_bam
-        File input_bam_index
-        String base_name
-        File recalibration_report
-        File ref_dict
-        File ref_fasta
-        File ref_fasta_index
-        String gatk_path
-        String docker
-        Int preemptible
-    }
-
-    command <<<
-
-
-
-        ~{gatk_path} --java-options "-Xmx3000m" \
-        PrintReads \
-        -I ~{input_bam} \
-        -O tmp.bam
-
-        ~{gatk_path} --java-options "-Xmx3000m" \
-        ApplyBQSR \
-        --add-output-sam-program-record \
-        -R ~{ref_fasta} \
-        -I tmp.bam \
-        --use-original-qualities \
-        -O ~{base_name}.bam \
-        --bqsr-recal-file ~{recalibration_report}
-
-    >>>
-
-    output {
-        File bam = "~{base_name}.bam"
-        File bam_index = "~{base_name}.bai"
-    }
-
-    runtime {
-        memory: "3500 MB"
-        disks: "local-disk " + ceil((size(input_bam, "GB") * 4) + 30) + " HDD"
-        preemptible: preemptible
-        docker: docker
-    }
-
-}
 
 task StarAlign {
     input {
@@ -1067,13 +887,236 @@ task Minimap2_align {
 }
 
 
+task DeepVariant_make_examples {
+    input {
+        File input_bam
+        File input_bam_index
+        File ref_fasta
+        File ref_fasta_index
+        String sample_name
+        Int task_idx
+        Int num_shards
+        File? intervals
+        Boolean is_long_reads
+        String docker
+        Int preemptible
+        Int cpu = 2
+        Float memory = 8
+    }
+
+    # RNA-seq specific: Illumina uses default 6 channels (compatible with RNA model), PacBio uses special params
+    # Default channels: read_base,base_quality,mapping_quality,strand,read_supports_variant,base_differs_from_ref
+    String extra_args = if is_long_reads then "--realign_reads=false --vsc_min_fraction_indels=0.12" else ""
+
+    command <<<
+        set -ex
+
+        /opt/deepvariant/bin/make_examples \
+            --mode calling \
+            --ref ~{ref_fasta} \
+            --reads ~{input_bam} \
+            --examples examples.tfrecord@~{num_shards}.gz \
+            --task ~{task_idx} \
+            ~{"--regions " + intervals} \
+            ~{extra_args}
+    >>>
+
+    output {
+        File examples = glob("examples.tfrecord-*-of-*.gz")[0]
+    }
+
+    runtime {
+        docker: docker
+        cpu: cpu
+        memory: memory + " GB"
+        disks: "local-disk " + ceil(size(input_bam, "GB") * 2 + 50) + " HDD"
+        preemptible: preemptible
+    }
+}
+
+
+task DeepVariant_call_variants {
+    input {
+        Array[File] examples
+        String sample_name
+        Boolean is_long_reads
+        Boolean use_gpu = false
+        String docker
+        String docker_gpu
+        Int cpu = 8
+        Float memory = 16
+        Int preemptible
+    }
+
+    String docker_image = if use_gpu then docker_gpu else docker
+
+    # For Illumina RNA-seq: use RNA-seq customized model (v1.4.0)
+    # For PacBio: use PACBIO model
+    String model_type = if is_long_reads then "PACBIO" else "WES"
+    String model_path = if is_long_reads then "/opt/models/pacbio/model.ckpt" else "/opt/models/rnaseq/model.ckpt"
+
+    command <<<
+        set -ex
+
+        # Copy all example shards to working directory so DeepVariant can glob them
+        mkdir -p examples_dir
+        for example_file in ~{sep=" " examples}; do
+            cp "$example_file" examples_dir/
+        done
+
+        # Use glob pattern for DeepVariant call_variants
+        /opt/deepvariant/bin/call_variants \
+            --outfile call_variants_output.tfrecord.gz \
+            --examples "examples_dir/examples.tfrecord-*-of-*.gz" \
+            --checkpoint ~{model_path}
+    >>>
+
+    output {
+        File call_variants_output = "call_variants_output.tfrecord.gz"
+    }
+
+    runtime {
+        docker: docker_image
+        cpu: cpu
+        memory: memory + " GB"
+        disks: "local-disk 100 HDD"
+        preemptible: 0
+        gpuType: if use_gpu then "nvidia-tesla-t4" else ""
+        gpuCount: if use_gpu then 1 else 0
+    }
+}
+
+
+task DeepVariant_postprocess_variants {
+    input {
+        File call_variants_output
+        File ref_fasta
+        File ref_fasta_index
+        String sample_name
+        Boolean output_gvcf = false
+        String docker
+        Int preemptible
+        Int cpu = 2
+        Float memory = 8
+    }
+
+    command <<<
+        set -ex
+
+        /opt/deepvariant/bin/postprocess_variants \
+            --ref ~{ref_fasta} \
+            --infile ~{call_variants_output} \
+            --outfile ~{sample_name}.vcf.gz \
+            ~{if output_gvcf then "--gvcf_outfile " + sample_name + ".g.vcf.gz" else ""}
+
+        tabix -f -p vcf ~{sample_name}.vcf.gz
+
+        # Create a marker file if gvcf was requested
+        if [ "~{output_gvcf}" == "true" ]; then
+            touch gvcf.created
+        fi
+    >>>
+
+    output {
+        File vcf = "~{sample_name}.vcf.gz"
+        File vcf_index = "~{sample_name}.vcf.gz.tbi"
+        Array[File] gvcf_files = glob("~{sample_name}.g.vcf.gz")
+    }
+
+    runtime {
+        docker: docker
+        cpu: cpu
+        memory: memory + " GB"
+        disks: "local-disk 50 HDD"
+        preemptible: preemptible
+    }
+}
+
+
+task flagCorrection {
+    input {
+        File input_bam
+        File input_bam_index
+        String base_name
+        String docker
+        Int preemptible
+        Int cpu = 4
+        Float memory = 16
+    }
+
+    command <<<
+        set -ex
+
+        # flagCorrection improves DeepVariant accuracy on long-read RNA-seq
+        # Corrects alignment flags for better variant calling
+        flagCorrection.sh ~{input_bam} ~{base_name}.corrected.bam
+
+        samtools index ~{base_name}.corrected.bam
+    >>>
+
+    output {
+        File bam = "~{base_name}.corrected.bam"
+        File bai = "~{base_name}.corrected.bam.bai"
+    }
+
+    runtime {
+        docker: docker
+        cpu: cpu
+        memory: memory + " GB"
+        disks: "local-disk " + ceil(size(input_bam, "GB") * 3 + 50) + " HDD"
+        preemptible: preemptible
+    }
+}
+
+
+task FilterDeepVariantVCF {
+    input {
+        File input_vcf
+        File input_vcf_index
+        String base_name
+        Int min_gq = 18  # DeepVariant recommended threshold for high precision
+        Int min_qual = 20
+        Int min_dp = 5
+        String docker
+        Int preemptible
+    }
+
+    command <<<
+        set -ex
+
+        # Apply DeepVariant quality filtering (GQ >= 18 recommended for RNA-seq)
+        # Per research: achieves 0.998 SNP precision, 0.989 INDEL precision
+        bcftools filter \
+            -i 'QUAL>=~{min_qual} && FORMAT/GQ>=~{min_gq} && FORMAT/DP>=~{min_dp}' \
+            -s LowQuality \
+            -O z \
+            -o ~{base_name}.filtered.vcf.gz \
+            ~{input_vcf}
+
+        tabix -p vcf ~{base_name}.filtered.vcf.gz
+    >>>
+
+    output {
+        File filtered_vcf = "~{base_name}.filtered.vcf.gz"
+        File filtered_vcf_index = "~{base_name}.filtered.vcf.gz.tbi"
+    }
+
+    runtime {
+        docker: docker
+        memory: "4 GB"
+        cpu: 1
+        disks: "local-disk " + ceil(size(input_vcf, "GB") * 2 + 20) + " HDD"
+        preemptible: preemptible
+    }
+}
+
+
 task MergeVCFs {
     input {
         Array[File] input_vcfs
         Array[File] input_vcfs_indexes
         String output_vcf_name
         Int? disk_size = 5
-        String gatk_path
         String docker
         Int preemptible
     }
@@ -1093,15 +1136,17 @@ task MergeVCFs {
         input_vcfs = '~{sep=',' input_vcfs}'.split(',')
         for input_vcf in input_vcfs:
             if not os.path.exists(input_vcf + '.tbi') and not os.path.exists(input_vcf + '.csi') and not os.path.exists(input_vcf + '.idx'):
-                subprocess.check_call(['bcftools', 'index', input_vcf])
+                subprocess.check_call(['bcftools', 'index', '-t', input_vcf])
         CODE
 
+        # Use bcftools concat instead of GATK MergeVcfs (no GATK dependency)
+        bcftools concat \
+            --allow-overlaps \
+            -O z \
+            -o ~{output_vcf_name} \
+            ~{sep=" " input_vcfs}
 
-
-        ~{gatk_path} --java-options "-Xmx2000m" \
-        MergeVcfs \
-        -I ~{sep=" -I " input_vcfs} \
-        -O ~{output_vcf_name}
+        tabix -p vcf ~{output_vcf_name}
 
     >>>
     runtime {
@@ -1152,7 +1197,6 @@ task MergeFastas {
         String docker
         Int preemptible
         String name
-        String gatk_path
     }
 
 
@@ -1160,9 +1204,9 @@ task MergeFastas {
         cat ~{ref_fasta} ~{extra_fasta} > ~{name}.fa
         samtools faidx ~{name}.fa
 
-        ~{gatk_path} --java-options "-Xmx1500m" \
-        CreateSequenceDictionary \
-        -R ~{name}.fa
+        # Create sequence dictionary using picard (no GATK dependency)
+        picard CreateSequenceDictionary \
+        R=~{name}.fa
     >>>
 
     runtime {
@@ -1186,7 +1230,6 @@ task CreateFastaIndex {
         File? input_fasta
         String docker
         Int preemptible
-        String gatk_path
     }
     String fasta_basename = basename(select_first([input_fasta]))
     String prefix_no_ext = basename(basename(select_first([input_fasta]), ".fa"), ".fasta")
@@ -1195,11 +1238,10 @@ task CreateFastaIndex {
         cp ~{input_fasta} ~{fasta_basename}
         samtools faidx ~{fasta_basename}
 
-
-        ~{gatk_path} --java-options "-Xmx1500m" \
-        CreateSequenceDictionary \
-        -R ~{fasta_basename} \
-        -O ~{prefix_no_ext}.dict
+        # Create sequence dictionary using picard (no GATK dependency)
+        picard CreateSequenceDictionary \
+        R=~{fasta_basename} \
+        O=~{prefix_no_ext}.dict
     >>>
 
     runtime {
@@ -1290,182 +1332,6 @@ task SplitReads {
     }
 }
 
-task VariantFiltration {
-    input {
-        File input_vcf
-        File input_vcf_index
-        String base_name
-        File ref_dict
-        File ref_fasta
-        File ref_fasta_index
-        String boosting_alg_type
-        String boosting_method
-        Boolean boost_indels
-        Array[String] boosting_attributes
-        Float boosting_score_threshold
-        Float memory
-
-        String scripts_path
-        String gatk_path
-        String docker
-        Int preemptible
-        Int cpu
-    }
-
-
-    String indel_alg_type = if (boosting_method == "LR") then "classifier" else "regressor"
-    String output_name = if (boosting_method == "none") then "~{base_name}.filtered.vcf.gz" else "~{base_name}.vcf.gz"
-    String boost_tmp = "~{boosting_method}_filtered.vcf"
-    String ctat_boost_output_snp = "~{boosting_method}_~{boosting_alg_type}_ctat_boosting_snps.vcf.gz"
-    String ctat_boost_output_indels = "~{boosting_method}_~{indel_alg_type}_ctat_boosting_indels.vcf.gz" # always regressor type for indels
-    String ctat_boost_output = "~{boosting_method}_~{boosting_alg_type}_ctat_boosting.vcf"
-    String median_replace_NA = if (boosting_method == "regressor") then "--replace_NA_w_median" else ""
-
-    command <<<
-        set -ex
-
-        # monitor_script.sh &
-
-        boosting_method="~{boosting_method}"
-
-        if [ "$boosting_method" == "none" ]; then
-
-            ~{gatk_path} --java-options "-Xmx2500m" \
-            VariantFiltration \
-            --R ~{ref_fasta} \
-            --V ~{input_vcf} \
-            --window 35 \
-            --cluster 3 \
-            --filter-name "FS" \
-            --filter "FS > 30.0" \
-            --filter-name "QD" \
-            --filter "QD < 2.0" \
-            --filter-name "SPLICEDIST" \
-            --filter "DJ < 3" \
-            -O tmp.vcf
-
-            # note, no hard-filtering applied to indels currently
-            ~{gatk_path} --java-options "-Xmx2500m" \
-            SelectVariants \
-            --R ~{ref_fasta} \
-            --V tmp.vcf \
-            --exclude-filtered \
-            -O ~{output_name}
-
-        else
-
-            ##############
-            ## snps first:
-            ~{scripts_path}/annotated_vcf_to_feature_matrix.py \
-                --vcf ~{input_vcf} \
-                --features ~{sep=',' boosting_attributes} \
-                --snps ~{median_replace_NA} \
-                --output ~{boosting_method}.snps.feature_matrix
-      
-
-            ~{scripts_path}/VariantBoosting/Apply_ML.py \
-                --feature_matrix ~{boosting_method}.snps.feature_matrix \
-                --snps \
-                --features ~{sep=',' boosting_attributes} \
-                --predictor ~{boosting_alg_type} \
-                --model ~{boosting_method} \
-                --output ~{boosting_method}.~{boosting_alg_type}.snps.feature_matrix.wPreds
-
-            indel_boost_output=""
-
-            if [ "~{boost_indels}" == "true" ] ; then
-
-                ##############
-                ## indels next
-                ~{scripts_path}/annotated_vcf_to_feature_matrix.py \
-                   --vcf ~{input_vcf} \
-                   --features ~{sep=',' boosting_attributes} \
-                   --indels ~{median_replace_NA} \
-                    --output ~{boosting_method}.indels.feature_matrix
-      
-
-                ~{scripts_path}/VariantBoosting/Apply_ML.py \
-                   --feature_matrix ~{boosting_method}.indels.feature_matrix \
-                   --indels \
-                   --features ~{sep=',' boosting_attributes} \
-                   --predictor ~{boosting_alg_type} \
-                   --model ~{boosting_method} \
-                   --output ~{boosting_method}.~{boosting_alg_type}.indels.feature_matrix.wPreds
-
-                   indel_boost_output="~{boosting_method}.~{boosting_alg_type}.indels.feature_matrix.wPreds"
-            fi
-
-        
-             #########
-             ## combine predictions into single output vcf
-      
-             ~{scripts_path}/annotate_boosted_vcf.py \
-                 --vcf_in ~{input_vcf} \
-                 --boosted_variants_matrix ~{boosting_method}.~{boosting_alg_type}.snps.feature_matrix.wPreds $indel_boost_output \
-                 --boost_type ~{boosting_alg_type}:~{boosting_method} \
-                 --vcf_out ~{boosting_method}.~{boosting_alg_type}.vcf
-
-             bgzip -c ~{boosting_method}.~{boosting_alg_type}.vcf > ~{output_name}
-      
-            
-        fi
-    >>>
-
-    runtime {
-        docker: docker
-        cpu: cpu
-        memory: memory + "GB"
-        disks: "local-disk " + ceil((size(input_vcf, "GB") * 4) + (size(ref_fasta, "GB") * 2) + 30) + " HDD"
-        preemptible: preemptible
-    }
-
-    output {
-        File vcf = "${output_name}"
-    }
-
-}
-
-
-task SplitIntervals {
-    input {
-        File? intervals
-        File ref_fasta
-        File ref_fasta_index
-        File ref_dict
-        Int scatter_count
-        String docker
-        Int preemptible
-        String gatk_path
-    }
-
-    command <<<
-        set -e
-        # monitor_script.sh &
-
-        mkdir interval-files
-        ~{gatk_path} --java-options "-Xmx1500m" \
-        SplitIntervals \
-        -R ~{ref_fasta} \
-        -scatter ~{scatter_count} \
-        -O interval-files \
-        ~{"-L " + intervals}
-
-        cp interval-files/*.interval_list .
-    >>>
-
-    runtime {
-        docker: docker
-        bootDiskSizeGb: 12
-        memory: "2G"
-        disks: "local-disk " + ceil(size(ref_fasta, "GB")*2) + " HDD"
-        preemptible: preemptible
-        cpu: 1
-    }
-
-    output {
-        Array[File] interval_files = glob("*.interval_list")
-    }
-}
 
 task CreateBamIndex {
     input {
@@ -1493,48 +1359,6 @@ task CreateBamIndex {
         disks: "local-disk " + ceil(1+size(input_bam, "GB")*1.5) + " HDD"
         docker: docker
         memory: memory
-        preemptible: preemptible
-    }
-}
-
-
-task SplitNCigarReads {
-    input {
-        File input_bam
-        File input_bam_index
-        String base_name
-        File ref_fasta
-        File ref_fasta_index
-        File ref_dict
-        String gatk_path
-        String docker
-        Int preemptible
-        Float memory
-    }
-    Int command_mem = ceil(memory*1000 - 500)
-
-    output {
-        File bam = "${base_name}.bam"
-        File bam_index = "${base_name}.bai"
-    }
-    command <<<
-        set -e
-        # monitor_script.sh &
-
-
-
-        ~{gatk_path} --java-options "-Xmx~{command_mem}m" \
-        SplitNCigarReads \
-        -R ~{ref_fasta} \
-        -I ~{input_bam} \
-        --read-validation-stringency LENIENT \
-        -O ~{base_name}.bam
-    >>>
-
-    runtime {
-        disks: "local-disk " + ceil(((size(input_bam, "GB") + 50) * 10 + size(ref_fasta, "GB") * 2)) + " SSD"
-        docker: docker
-        memory: memory + "GB"
         preemptible: preemptible
     }
 }
@@ -1580,53 +1404,6 @@ task SplitNCigarLongReads {
 }
 
 
-
-
-task HaplotypeCaller {
-    input {
-        File input_bam
-        File input_bam_index
-        String base_name
-        File? interval_list
-        File ref_dict
-        File ref_fasta
-        File ref_fasta_index
-        String gatk_path
-        String docker
-        Int preemptible
-        Float memory
-        String? extra_args
-    }
-    Int command_mem = ceil(memory*1000 - 500)
-
-
-    output {
-        File output_vcf = "${base_name}.vcf.gz"
-        File output_vcf_index = "${base_name}.vcf.gz.tbi"
-        File output_realigned_bam = "${base_name}.HC_realigned.bam"
-        File output_realigned_bai = "${base_name}.HC_realigned.bai"
-    }
-    command <<<
-        set -e
-        # monitor_script.sh &
-
-
-        ~{gatk_path} --java-options "-Xmx~{command_mem}m" \
-        HaplotypeCaller \
-        -R ~{ref_fasta} \
-        -I ~{input_bam} \
-        -O ~{base_name}.vcf.gz \
-        -bamout ~{base_name}.HC_realigned.bam \
-        ~{"" + extra_args} \
-        ~{"-L " + interval_list}
-    >>>
-    runtime {
-        docker: docker
-        memory: memory + "GB"
-        disks: "local-disk " + ceil((size(input_bam, "GB") * 2) + 30) + " HDD"
-        preemptible: preemptible
-    }
-}
 
 
 

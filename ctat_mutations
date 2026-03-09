@@ -8,8 +8,8 @@ import tempfile
 
 import sys
 
-VERSION = "ctat_mutations-4.3.0"
-#VERSION = "ctat_mutations-BLEEDING_EDGE-postv4.3.0"
+VERSION = "ctat_mutations-5.0.0"
+#VERSION = "ctat_mutations-BLEEDING_EDGE-postv5.0.0"
 
 if sys.version_info[0] < 3:
     print("This script requires Python 3")
@@ -65,11 +65,11 @@ def main():
     
     parser.add_argument(
         "--bam",
-        help="Previously aligned bam file. When VCF is provided, the output from ApplyBQSR should be provided as the bam input.",
+        help="Previously aligned bam file.",
     )
     parser.add_argument(
         "--vcf",
-        help="Previously generated vcf file to annotate and filter. When provided, the output from ApplyBQSR should be provided as the bam input.",
+        help="Previously generated vcf file to annotate and filter.",
     )
 
     parser.add_argument("--sample_id", required=True, help="Sample id")
@@ -93,30 +93,16 @@ def main():
     )
     
     parser.add_argument(
-        "--HC_xtra_args",
-        help="extra arguments to provide to GATK HaplotypeCaller",
-        default=None,
-        type=str
-    )
-
-    parser.add_argument(
         "--variant_ready_bam",
         action="store_true",
-        help="Skip initial read processing involving setting read groups, duplicate marking, splitNcigar, and base recalibration... go immediately on to calling variants",
-    )
-    
-    parser.add_argument(
-        "--no_bqsr",
-        action="store_true",
-        help="Skip base quality score recalibration of bam files before variant calling.",
+        help="Skip initial read processing involving setting read groups, duplicate marking, and splitNcigar... go immediately on to calling variants",
     )
 
     parser.add_argument(
         "--filter_ready_vcf",
         action="store_true",
-        help="a fully annotated vcf is provided, so move directly on to filtering/boosting"
+        help="a fully annotated vcf is provided, so move directly on to filtering"
         )
-    
 
     parser.add_argument(
         "--sequencing_platform",
@@ -125,40 +111,43 @@ def main():
     )
 
     parser.add_argument(
-        "--boosting_method",
-        default="none",
-        choices=[
-                "none",
-                "AdaBoost",
-                "LR",
-                "NGBoost",
-                "RF",
-                "SGBoost",
-                "SVM_RBF",
-                "SVML",
-                "XGBoost",
-        ],
-        help="Variant calling boosting method",
+        "--deepvariant_use_gpu",
+        action="store_true",
+        help="Use GPU acceleration for DeepVariant call_variants step (much faster)",
     )
 
     parser.add_argument(
-        "--boosting_alg_type",
-        default="classifier",
-        choices=["classifier", "regressor"],
-        help="Boosting algorithm type: classifier or regressor",
+        "--deepvariant_shards",
+        type=int,
+        default=18,
+        help="Number of shards for DeepVariant make_examples parallelization",
     )
 
     parser.add_argument(
-        "--boosting_score_threshold",
-        default=0.05,
-        type=float,
-        help="Minimum score threshold for boosted variant selection",
+        "--output_gvcf",
+        action="store_true",
+        help="Output gVCF file in addition to VCF",
     )
 
     parser.add_argument(
-        "--boosting_attributes",
-        default="AC,ALT,BaseQRankSum,DJ,DP,ED,Entropy,ExcessHet,FS,Homopolymer,LEN,MLEAF,MMF,QUAL,REF,RPT,RS,ReadPosRankSum,SAO,SOR,TCR,TDM,VAF,VMMF",
-        help="Variant attributes on which to perform boosting",
+        "--deepvariant_min_gq",
+        type=int,
+        default=18,
+        help="Minimum genotype quality (GQ) for DeepVariant filtering. Recommended: 18 for high precision.",
+    )
+
+    parser.add_argument(
+        "--deepvariant_min_qual",
+        type=int,
+        default=20,
+        help="Minimum QUAL score for DeepVariant filtering",
+    )
+
+    parser.add_argument(
+        "--deepvariant_min_dp",
+        type=int,
+        default=5,
+        help="Minimum depth (DP) for DeepVariant filtering",
     )
 	
     parser.add_argument(
@@ -197,11 +186,6 @@ def main():
         "--no_mark_duplicates", action="store_true", help="Do not mark duplicates"
     )
 
-    parser.add_argument(
-        "--gatk",
-        default="gatk",
-        help="Optional path to GATK when not running in a docker container",
-    )
     parser.add_argument(
         "--cromwell", help="Optional path to cromwell jar file",
     )
@@ -265,23 +249,22 @@ def main():
     ctat_genome_lib_path = args.genome_lib_dir
     variant_ready_bam = args.variant_ready_bam
     filter_ready_vcf = args.filter_ready_vcf
-    no_bqsr = args.no_bqsr
     sequencing_platform = args.sequencing_platform
-    boosting_method = args.boosting_method
     variant_scatter_count = args.variant_scatter_count
-    boosting_alg_type = args.boosting_alg_type
-    boosting_score_threshold = args.boosting_score_threshold
-    boosting_attributes = args.boosting_attributes
     no_include_read_var_pos_annotations = args.no_include_read_var_pos_annotations
     no_cravat = args.no_cravat
     no_filter_cancer_variants = args.no_filter_cancer_variants
     sample_id = args.sample_id
-    gatk_path = args.gatk
     cromwell = args.cromwell
     no_mark_duplicates = args.no_mark_duplicates
     extra_fasta = args.extra_fasta
     cpu = args.cpu
-    hc_xtra_args = args.HC_xtra_args
+    deepvariant_use_gpu = args.deepvariant_use_gpu
+    deepvariant_shards = args.deepvariant_shards
+    output_gvcf = args.output_gvcf
+    deepvariant_min_gq = args.deepvariant_min_gq
+    deepvariant_min_qual = args.deepvariant_min_qual
+    deepvariant_min_dp = args.deepvariant_min_dp
     
 
     output_directory = args.outputdir
@@ -395,10 +378,6 @@ def main():
     if cpu is None:
         cpu = min(16, os.cpu_count())
 
-    if hc_xtra_args is not None:
-        input_json["haplotype_caller_xtra_args"] = hc_xtra_args
-
-
     if args.is_long_reads:
         if not os.path.exists(mm2_genome_idx) or not os.path.exists(mm2_splice_bed):
             logger.critical("Error, missing ctat genome lib minimap2 resources. Be sure to run the ctat mutation lib prep step (see wiki docs)")
@@ -442,46 +421,29 @@ def main():
     
     input_json["star_reference_dir"] = star_reference
     input_json["filter_cancer_variants"] = not no_filter_cancer_variants
-    input_json["apply_bqsr"] = not no_bqsr
-    
+
     input_json["variant_ready_bam"] = variant_ready_bam
     input_json["filter_ready_vcf"] = filter_ready_vcf
-    
-    input_json["boosting_alg_type"] = boosting_alg_type
-    input_json["boosting_method"] = boosting_method
-    input_json["boosting_attributes"] = boosting_attributes.split(",")
-    input_json["boosting_score_threshold"] = boosting_score_threshold
+
+    input_json["deepvariant_use_gpu"] = deepvariant_use_gpu
+    input_json["deepvariant_shards"] = deepvariant_shards
+    input_json["output_gvcf"] = output_gvcf
+    input_json["deepvariant_min_gq"] = deepvariant_min_gq
+    input_json["deepvariant_min_qual"] = deepvariant_min_qual
+    input_json["deepvariant_min_dp"] = deepvariant_min_dp
+
     input_json["sequencing_platform"] = sequencing_platform
-    input_json["docker"] = "a/b"  # hack to make cromwell happy
+    input_json["docker"] = "trinityctat/ctat_mutations:5.0.0"
+    # Using DeepVariant v1.4.0 to match RNA-seq model version
+    input_json["deepvariant_docker"] = "google/deepvariant:1.4.0"
     input_json["variant_scatter_count"] = variant_scatter_count
 
+    # Disable time-consuming annotations that aren't essential
+    input_json["include_read_var_pos_annotations"] = not no_include_read_var_pos_annotations
+    input_json["incl_blat_ED"] = False
 
     if args.star_limitBAMsortRAM:
         input_json["star_limitBAMsortRAM"] = args.star_limitBAMsortRAM
-
-    if boosting_method == "none":
-        # disable the time-consuming annotations that aren't essential.
-        input_json[
-            "include_read_var_pos_annotations"
-        ] = False
-
-        input_json[
-            "incl_blat_ED"
-        ] = False
-
-    else:
-        input_json[
-            "include_read_var_pos_annotations"
-        ] = not no_include_read_var_pos_annotations
-
-    
-    
-    if gatk_path is not None:
-        input_json["gatk_path"] = gatk_path
-    if not is_in_path(gatk_path):
-        exit("GATK not found")
-    if not is_in_path("pblat"):
-        exit("pblat not found")
 
     # if mark_duplicates_memory is not None:
     #     input_json['mark_duplicates_memory'] = mark_duplicates_memory

@@ -24,7 +24,7 @@ workflow annotate_variants_wf {
         Boolean incl_splice_dist = true
         Boolean incl_blat_ED = true
         Boolean incl_cosmic = true
-        Boolean incl_cravat = true
+        Boolean incl_cravat = false  # Disabled due to SQLite locking issues with read-only genome lib mount
 
         Boolean singlecell_mode = false
 

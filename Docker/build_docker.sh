@@ -4,7 +4,8 @@ set -e
 
 VERSION=`cat VERSION.txt`
 
-docker build -t trinityctat/ctat_mutations:$VERSION .
-docker build -t trinityctat/ctat_mutations:latest .
+# Build from parent directory context to include .git and all source files
+docker build -f Dockerfile -t trinityctat/ctat_mutations:$VERSION ..
+docker build -f Dockerfile -t trinityctat/ctat_mutations:latest ..
 
 

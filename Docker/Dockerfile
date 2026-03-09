@@ -1,172 +1,230 @@
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
-MAINTAINER bhaas@broadinstitute.org
-
+LABEL maintainer="bhaas@broadinstitute.org"
+LABEL description="CTAT-Mutations v5.0.0 - RNA-seq variant calling with DeepVariant"
+LABEL version="5.0.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-
-RUN apt-get --allow-releaseinfo-change update && apt-get -qq -y install --no-install-recommends \
+# Install system dependencies
+RUN apt-get update && apt-get -qq -y install --no-install-recommends \
     automake \
+    autoconf \
+    autotools-dev \
     build-essential \
     bzip2 \
     ca-certificates \
     curl \
-    default-jre \
+    openjdk-21-jre-headless \
     g++ \
     gcc \
     git \
     libbz2-dev \
+    libcurl4-openssl-dev \
     libdb-dev \
     liblzma-dev \
+    libncurses5-dev \
     libssl-dev \
+    libtool \
     make \
     pbzip2 \
     perl \
     pigz \
     procps \
+    tabix \
     unzip \
     wget \
     zlib1g \
     zlib1g-dev \
-    zlibc
+ && rm -rf /var/lib/apt/lists/*
 
-RUN curl -L http://cpanmin.us | perl - App::cpanminus
-RUN cpanm install URI::Escape
+# Install Perl modules
+RUN curl -L http://cpanmin.us | perl - App::cpanminus && \
+    cpanm install URI::Escape
 
-ENV SRC /usr/local/src
-ENV BIN /usr/local/bin
+ENV SRC=/usr/local/src
+ENV BIN=/usr/local/bin
 
-
-# Install Miniconda
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+# Install Miniforge (community conda distribution without TOS requirements)
 WORKDIR $SRC
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda_install.sh && \
-   bash ./miniconda_install.sh -b -p $BIN/miniconda3
+RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniforge_install.sh && \
+    bash ./miniforge_install.sh -b -p $BIN/miniforge3 && \
+    rm miniforge_install.sh
 
-ENV PATH="$BIN/miniconda3/bin:${PATH}"
+ENV PATH="$BIN/miniforge3/bin:${PATH}"
 
-RUN conda install python=3.10.12
+# Install Python packages (keeping open-cravat and igv-reports at specific versions for compatibility)
+# Note: setuptools<70 is required for pkg_resources which is needed by open-cravat
+# Note: chardet<5.0 is required for open-cravat (newer versions removed universaldetector)
+RUN conda install -y python=3.11 pip "setuptools<70" wheel && \
+    pip install --no-cache-dir --upgrade-strategy=only-if-needed \
+        requests \
+        pandas \
+        scikit-learn \
+        aiosqlite3 \
+        "setuptools<70" \
+        "chardet<5.0" \
+        open-cravat==2.1.0 \
+        igv-reports==1.9.0 && \
+    conda clean -a -y
+
+# Configure open-cravat
+RUN oc config md > /dev/null || true
 
 
-RUN conda install -y pip && pip install requests  pandas  xgboost statsmodels ngboost scikit-learn
-
-RUN pip install open-cravat==2.1.0
-
-# Run an oc command to generate config files
-RUN oc config md > /dev/null
-
-
-## gatk
+## Samtools 1.21 (latest stable)
+ENV SAMTOOLS_VERSION=1.21
 WORKDIR $SRC
-ENV GATK_VERSION=4.1.9.0
-RUN wget -q https://github.com/broadinstitute/gatk/releases/download/${GATK_VERSION}/gatk-${GATK_VERSION}.zip && \
-    unzip gatk-${GATK_VERSION}.zip && \
-    rm $SRC/gatk-${GATK_VERSION}.zip
+RUN wget -q https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VERSION}/samtools-${SAMTOOLS_VERSION}.tar.bz2 && \
+    tar xjf samtools-${SAMTOOLS_VERSION}.tar.bz2 && \
+    cd samtools-${SAMTOOLS_VERSION} && \
+    ./configure --without-curses && \
+    make -j$(nproc) && \
+    make install && \
+    cd .. && \
+    rm -rf samtools-${SAMTOOLS_VERSION} samtools-${SAMTOOLS_VERSION}.tar.bz2
 
-ENV GATK_HOME $SRC/gatk-${GATK_VERSION}
-
-## Samtools
-ENV SAMTOOLS_VERSION=1.9
+## BCFtools 1.21 (latest stable)
+ENV BCFTOOLS_VERSION=1.21
 WORKDIR $SRC
-RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VERSION}/samtools-${SAMTOOLS_VERSION}.tar.bz2" && \
-    wget -q $SAMTOOLS_URL && \
-    tar xvf samtools-${SAMTOOLS_VERSION}.tar.bz2 && \
-    cd samtools-${SAMTOOLS_VERSION}/htslib-${SAMTOOLS_VERSION} && ./configure && make && make install && \
-    cd ../ && ./configure --without-curses && make && make install && \
-    rm $SRC/samtools-${SAMTOOLS_VERSION}.tar.bz2
+RUN wget -q https://github.com/samtools/bcftools/releases/download/${BCFTOOLS_VERSION}/bcftools-${BCFTOOLS_VERSION}.tar.bz2 && \
+    tar xjf bcftools-${BCFTOOLS_VERSION}.tar.bz2 && \
+    cd bcftools-${BCFTOOLS_VERSION} && \
+    ./configure && \
+    make -j$(nproc) && \
+    make install && \
+    cd .. && \
+    rm -rf bcftools-${BCFTOOLS_VERSION} bcftools-${BCFTOOLS_VERSION}.tar.bz2
 
-## BCFtools
-RUN wget -q https://github.com/samtools/bcftools/releases/download/1.9/bcftools-1.9.tar.bz2 && \
-    tar xvf bcftools-1.9.tar.bz2 && \
-    cd bcftools-1.9 && ./configure && make && make install && \
-    rm $SRC/bcftools-1.9.tar.bz2
-
-
-## Bedtools
-RUN wget -q https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools-2.30.0.tar.gz && \
-   tar -zxvf bedtools-2.30.0.tar.gz && \
-   cd bedtools2 && \
-   make && \
-   cp bin/* $BIN/ && \
-   rm $SRC/bedtools-2.30.0.tar.gz
-
-# pblat
-RUN wget -q https://github.com/icebert/pblat/archive/2.5.tar.gz && \
-   tar -zxvf 2.5.tar.gz && \
-   cd pblat-2.5 && \
-   make && \
-   cp pblat $BIN/ && \
-   rm $SRC/2.5.tar.gz
-
-## update igv-reports to current bleeding edge
-#WORKDIR $SRC
-#ENV IGV_REPORTS_CO=1086ed7258c09bfe213836e2dc53b043c352a4a9
-#RUN git clone https://github.com/igvteam/igv-reports.git && \
-#    cd igv-reports && \
-#    git checkout ${IGV_REPORTS_CO} && \
-#    pip install -e .
-
-RUN pip install igv-reports==1.9.0
-
-#RUN wget -q https://github.com/broadinstitute/cromwell/releases/download/58/cromwell-58.jar -O /usr/local/src/ctat-mutations/WDL/cromwell-58.jar
-#RUN wget -q https://raw.githubusercontent.com/klarman-cell-observatory/cumulus/master/docker/monitor_script.sh -O /usr/local/src/ctat-mutations/WDL/monitor_script.sh
-#RUN chmod a+rx /usr/local/src/ctat-mutations/WDL/monitor_script.sh
-
-
-## STAR
+## Bedtools 2.31.1 (latest stable)
+ENV BEDTOOLS_VERSION=2.31.1
 WORKDIR $SRC
-ENV STAR_VERSION=2.7.8a
-RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
-    wget -q -P $SRC $STAR_URL &&\
-    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
-    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin && \
-    rm ${STAR_VERSION}.tar.gz
+RUN wget -q https://github.com/arq5x/bedtools2/releases/download/v${BEDTOOLS_VERSION}/bedtools-${BEDTOOLS_VERSION}.tar.gz && \
+    tar -zxf bedtools-${BEDTOOLS_VERSION}.tar.gz && \
+    cd bedtools2 && \
+    make -j$(nproc) && \
+    cp bin/* $BIN/ && \
+    cd .. && \
+    rm -rf bedtools2 bedtools-${BEDTOOLS_VERSION}.tar.gz
 
-
-#~~~~~~~~~~~
-## Picard tools
-#~~~~~~~~~~~
+## STAR 2.7.11b (latest stable)
+ENV STAR_VERSION=2.7.11b
 WORKDIR $SRC
-RUN wget https://github.com/broadinstitute/picard/releases/download/2.25.2/picard.jar
-ENV PICARD_HOME $SRC/picard.jar
+RUN wget -q https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz && \
+    tar -xzf ${STAR_VERSION}.tar.gz && \
+    mv STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR $BIN/ && \
+    rm -rf STAR-${STAR_VERSION} ${STAR_VERSION}.tar.gz
 
 
-## Minimap2
-
+## Picard 3.3.0 (latest stable)
+ENV PICARD_VERSION=3.3.0
 WORKDIR $SRC
-RUN curl -L https://github.com/lh3/minimap2/releases/download/v2.26/minimap2-2.26_x64-linux.tar.bz2 | tar -jxvf - && \
-    mv ./minimap2-2.26_x64-linux/minimap2 $BIN/
+RUN wget -q https://github.com/broadinstitute/picard/releases/download/${PICARD_VERSION}/picard.jar
+ENV PICARD_HOME=$SRC/picard.jar
 
+# Create picard wrapper script
+RUN echo '#!/bin/bash' > $BIN/picard && \
+    echo 'java -jar /usr/local/src/picard.jar "$@"' >> $BIN/picard && \
+    chmod +x $BIN/picard
 
-ENV PATH=/usr/local/src/gatk-${GATK_VERSION}:/usr/local/src/ctat-mutations/WDL/:$PATH
-
-RUN pip install aiosqlite3
-
-# K8
-RUN curl -L https://github.com/attractivechaos/k8/releases/download/v0.2.4/k8-0.2.4.tar.bz2 | tar -jxf - && \
-    cp k8-0.2.4/k8-`uname -s` $BIN/k8
-
-
-## NCIP CTAT mutations
-
-RUN apt-get update && apt-get install -y git
-
+## Minimap2 2.28 (latest stable)
+ENV MINIMAP2_VERSION=2.28
 WORKDIR $SRC
-ENV CTAT_MUTATIONS_TAG=v4.3.0
-ENV CTAT_MUTATIONS_COMMIT=a092203384a665271f95980aad0830e1037f33bd
-RUN git clone https://github.com/NCIP/ctat-mutations.git && \
-    cd ctat-mutations && \
-    git checkout $CTAT_MUTATIONS_COMMIT && \
-    git submodule init && git submodule update && \
-    git submodule foreach --recursive git submodule init && \
-    git submodule foreach --recursive git submodule update && \
+RUN wget -q https://github.com/lh3/minimap2/releases/download/v${MINIMAP2_VERSION}/minimap2-${MINIMAP2_VERSION}_x64-linux.tar.bz2 && \
+    tar -xjf minimap2-${MINIMAP2_VERSION}_x64-linux.tar.bz2 && \
+    mv minimap2-${MINIMAP2_VERSION}_x64-linux/minimap2 $BIN/ && \
+    rm -rf minimap2-${MINIMAP2_VERSION}_x64-linux minimap2-${MINIMAP2_VERSION}_x64-linux.tar.bz2
+
+
+## DeepVariant v1.9.0 configuration
+# Note: DeepVariant binaries are used via official Docker image (google/deepvariant:1.9.0)
+# The WDL workflow will use the official DeepVariant Docker containers
+# Models are included in the DeepVariant Docker images
+ENV DEEPVARIANT_VERSION=1.9.0
+
+# Download RNA-seq model (v1.4.0 - most recent RNA model)
+# This is used for Illumina RNA-seq variant calling
+RUN mkdir -p /opt/models/rnaseq && \
+    cd /opt/models/rnaseq && \
+    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.data-00000-of-00001 && \
+    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.example_info.json && \
+    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.index && \
+    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.meta && \
+    cp model.ckpt.example_info.json example_info.json
+
+# Note: PacBio models are included in the DeepVariant Docker image
+
+
+## flagCorrection - improves DeepVariant accuracy on long-read RNA-seq
+# Note: flagCorrection is an R script, but we'll skip installation for now
+# Users can run it separately if needed, or we can add R dependencies later
+# WORKDIR $SRC
+# RUN git clone https://github.com/vladimirsouza/lrRNAseqVariantCalling.git && \
+#     cd lrRNAseqVariantCalling/tools && \
+#     chmod +x flagCorrection.r && \
+#     cp flagCorrection.r /usr/local/bin/flagCorrection
+
+
+## K8 1.2 (latest stable)
+ENV K8_VERSION=1.2
+WORKDIR $SRC
+RUN wget -q https://github.com/attractivechaos/k8/releases/download/v${K8_VERSION}/k8-${K8_VERSION}.tar.bz2 && \
+    tar -xjf k8-${K8_VERSION}.tar.bz2 && \
+    cp k8-${K8_VERSION}/k8-x86_64-Linux $BIN/k8 && \
+    rm -rf k8-${K8_VERSION} k8-${K8_VERSION}.tar.bz2
+
+ENV PATH=/usr/local/src/ctat-mutations/WDL/:$PATH
+
+
+## NCIP CTAT mutations v5.0.0
+WORKDIR $SRC
+ENV CTAT_MUTATIONS_TAG=v5.0.0
+# Note: Update commit hash after tagging v5.0.0 release
+# ENV CTAT_MUTATIONS_COMMIT=<commit_hash_here>
+
+# For now, use local code during development
+# Once v5.0.0 is tagged and released, uncomment below:
+# RUN git clone https://github.com/NCIP/ctat-mutations.git && \
+#     cd ctat-mutations && \
+#     git checkout $CTAT_MUTATIONS_TAG && \
+#     git submodule init && git submodule update && \
+#     git submodule foreach --recursive git submodule init && \
+#     git submodule foreach --recursive git submodule update && \
+#     make
+
+# Temporary: Copy local code for development/testing
+# Note: Build context is parent directory
+COPY . /usr/local/src/ctat-mutations/
+WORKDIR /usr/local/src/ctat-mutations
+RUN if [ -d .git ]; then \
+        git submodule init && git submodule update && \
+        git submodule foreach --recursive git submodule init && \
+        git submodule foreach --recursive git submodule update; \
+    fi && \
+    cd plugins/bamsifter/htslib && autoreconf -i && cd /usr/local/src/ctat-mutations && \
     make
-    
 
-# docker cleanup
+# Docker cleanup - remove build dependencies but keep runtime dependencies
 RUN apt-get -qq -y remove automake build-essential curl gcc g++ git make unzip wget && \
     apt-get -qq -y autoremove && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /var/log/dpkg.log
+    rm -rf /var/lib/apt/lists/* /var/log/dpkg.log /tmp/* /var/tmp/*
+
+WORKDIR /usr/local/src/ctat-mutations
+
+# Version information
+# Ubuntu: 24.04 LTS
+# Java: OpenJDK 21
+# Python: 3.11
+# Samtools: 1.21
+# BCFtools: 1.21
+# Bedtools: 2.31.1
+# STAR: 2.7.11b
+# Picard: 3.3.0
+# Minimap2: 2.28
+# DeepVariant: 1.9.0 (with RNA-seq model v1.4.0)
+# K8: 1.2
+# open-cravat: 2.1.0 (pinned for compatibility)
+# igv-reports: 1.9.0 (pinned for compatibility)
+# CTAT-Mutations: 5.0.0
 
