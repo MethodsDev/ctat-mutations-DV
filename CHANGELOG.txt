@@ -29,15 +29,14 @@
 
 ### Improvements
 
-- **Removed AddOrReplaceReadGroups task**: No longer needed for DeepVariant
+- **Made AddOrReplaceReadGroups conditional**: Runs only when needed
   - GATK HaplotypeCaller required strict read group (RG) tags, but DeepVariant does not
   - DeepVariant now uses --sample_name parameter directly for consistent naming
   - Changed add_read_groups default from true to false
-  - Removed sequencing_platform parameter (was only used for RG tags)
-  - Simplified BAM preprocessing pipeline by ~39 lines of code
-  - Faster pipeline execution (skips unnecessary Picard AddOrReplaceReadGroups step)
-  - Still supports optional read group addition via --add_read_groups flag for legacy compatibility
-  - WDL/ctat-mutations-DV.wdl lines 71, 112, 172, 261-271, 276, 306-307, 334-335, 392-393, 470-471, 530-531, 694-733
+  - AddOrReplaceReadGroups now runs automatically when mark_duplicates=true (since Picard MarkDuplicates requires RG tags)
+  - Faster pipeline execution when mark_duplicates=false (skips unnecessary Picard step)
+  - Can be explicitly enabled via add_read_groups=true for legacy compatibility
+  - WDL/ctat-mutations-DV.wdl
 
 ### Verified Functionality
 - ✅ Complete Illumina short-read pipeline (reads_1.fastq.gz + reads_2.fastq.gz) - ~25 minutes

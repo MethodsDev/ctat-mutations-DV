@@ -168,7 +168,7 @@ workflow ctat_mutations_DV {
       
         genome_version:{help:"Genome version for annotating variants using Cravat and SnpEff", choices:["hg19", "hg38"]}
 
-        add_read_groups : {help:"Whether to add read groups and sort the bam. Not required for DeepVariant (default: false). Only needed for legacy compatibility or downstream tools that require RG tags."}
+        add_read_groups : {help:"Whether to add read groups and sort the bam. Not required for DeepVariant but automatically enabled when mark_duplicates=true (since Picard MarkDuplicates requires RG tags). Default: false."}
         mark_duplicates : {help:"Whether to mark duplicates"}
         filter_cancer_variants:{help:"Whether to generate cancer VCF file"}
         annotate_variants:{help:"Whether to annotate the vcf file"}
@@ -256,10 +256,24 @@ workflow ctat_mutations_DV {
         }
     }
 
+    # AddOrReplaceReadGroups: Not needed for DeepVariant, but required for MarkDuplicates
+    # Run if explicitly requested OR if mark_duplicates is enabled (since Picard MarkDuplicates requires RG tags)
+    if(!vcf_input && !variant_ready_bam && (add_read_groups || (mark_duplicates && !is_long_reads))) {
+        call AddOrReplaceReadGroups {
+            input:
+                input_bam = select_first([NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
+                sample_id = sample_id,
+                base_name = sample_id + '.sorted',
+                sequencing_platform = "ILLUMINA",
+                docker = docker,
+                preemptible = preemptible
+        }
+    }
+
     if(!vcf_input && !variant_ready_bam && mark_duplicates && !is_long_reads ) {
         call MarkDuplicates {
             input:
-                input_bam = select_first([NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
+                input_bam = select_first([AddOrReplaceReadGroups.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
                 base_name = sample_id + ".dedupped",
                 memory = mark_duplicates_memory,
                 docker = docker,
@@ -675,6 +689,46 @@ task MarkDuplicates {
         preemptible: preemptible
     }
 
+}
+
+task AddOrReplaceReadGroups {
+    input {
+        File input_bam
+        String sequencing_platform
+        String base_name
+        String docker
+        Int preemptible
+        String sample_id
+    }
+    String unique_id = sub(sample_id, "\\.", "_")
+
+    command <<<
+        set -e
+
+        picard AddOrReplaceReadGroups \
+        INPUT=~{input_bam} \
+        OUTPUT=~{base_name}.sorted.bam \
+        SORT_ORDER=coordinate \
+        RGID=id \
+        RGLB=library \
+        RGPL=~{sequencing_platform} \
+        RGPU=machine \
+        RGSM=~{unique_id}
+
+        samtools index "~{base_name}.sorted.bam"
+    >>>
+
+    output {
+        File bam = "~{base_name}.sorted.bam"
+        File bai = "~{base_name}.sorted.bam.bai"
+    }
+
+    runtime {
+        memory: "1G"
+        disks: "local-disk " + ceil((size(input_bam, "GB") * 3) + 30) + " HDD"
+        docker: docker
+        preemptible: preemptible
+    }
 }
 
 task StarAlign {
