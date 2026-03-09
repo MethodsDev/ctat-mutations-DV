@@ -27,6 +27,18 @@
 - **Updated .dockerignore**: Excluded test outputs to prevent build permission errors
   - Added: testing/example.*, testing/cromwell-executions, testing/*.log, testing/__pycache__
 
+### Improvements
+
+- **Removed AddOrReplaceReadGroups task**: No longer needed for DeepVariant
+  - GATK HaplotypeCaller required strict read group (RG) tags, but DeepVariant does not
+  - DeepVariant now uses --sample_name parameter directly for consistent naming
+  - Changed add_read_groups default from true to false
+  - Removed sequencing_platform parameter (was only used for RG tags)
+  - Simplified BAM preprocessing pipeline by ~39 lines of code
+  - Faster pipeline execution (skips unnecessary Picard AddOrReplaceReadGroups step)
+  - Still supports optional read group addition via --add_read_groups flag for legacy compatibility
+  - WDL/ctat-mutations-DV.wdl lines 71, 112, 172, 261-271, 276, 306-307, 334-335, 392-393, 470-471, 530-531, 694-733
+
 ### Verified Functionality
 - ✅ Complete Illumina short-read pipeline (reads_1.fastq.gz + reads_2.fastq.gz) - ~25 minutes
 - ✅ Complete PacBio long-read pipeline (UHR.pbio.fq.gz) - ~26 minutes

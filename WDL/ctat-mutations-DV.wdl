@@ -68,7 +68,7 @@ workflow ctat_mutations_DV {
         Boolean filter_ready_vcf = false
 
         Boolean mark_duplicates = true
-        Boolean add_read_groups = true
+        Boolean add_read_groups = false
 
         Int variant_filtration_cpu = 1
         Int variant_annotation_cpu = 5
@@ -109,7 +109,6 @@ workflow ctat_mutations_DV {
         Float star_memory = 43
         Boolean output_unmapped_reads = false
 
-	        String sequencing_platform = "ILLUMINA"
         Int preemptible = 2
         String docker = "trinityctat/ctat_mutations:latest"
         Int variant_scatter_count = 6
@@ -169,13 +168,12 @@ workflow ctat_mutations_DV {
       
         genome_version:{help:"Genome version for annotating variants using Cravat and SnpEff", choices:["hg19", "hg38"]}
 
-        add_read_groups : {help:"Whether to add read groups and sort the bam. Turn off for optimization with prealigned sorted bam with read groups."}
+        add_read_groups : {help:"Whether to add read groups and sort the bam. Not required for DeepVariant (default: false). Only needed for legacy compatibility or downstream tools that require RG tags."}
         mark_duplicates : {help:"Whether to mark duplicates"}
         filter_cancer_variants:{help:"Whether to generate cancer VCF file"}
         annotate_variants:{help:"Whether to annotate the vcf file"}
         filter_variants:{help:"Whether to filter VCF file"}
 
-        sequencing_platform:{help:"The sequencing platform used to generate the sample"}
         include_read_var_pos_annotations :{help: "Add vcf annotation that requires variant to be at least 6 bases from ends of reads."}
 
         deepvariant_use_gpu:{help:"Use GPU acceleration for DeepVariant call_variants step"}
@@ -257,23 +255,11 @@ workflow ctat_mutations_DV {
             preemptible = preemptible
         }
     }
-    
-    if(!vcf_input && !variant_ready_bam && add_read_groups) {
-        call AddOrReplaceReadGroups {
-            input:
-                input_bam = select_first([NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
-                sample_id = sample_id,
-                base_name = sample_id + '.sorted',
-                sequencing_platform=sequencing_platform,
-                docker = docker,
-                preemptible = preemptible
-        }
-    }
 
     if(!vcf_input && !variant_ready_bam && mark_duplicates && !is_long_reads ) {
         call MarkDuplicates {
             input:
-                input_bam = select_first([AddOrReplaceReadGroups.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
+                input_bam = select_first([NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
                 base_name = sample_id + ".dedupped",
                 memory = mark_duplicates_memory,
                 docker = docker,
@@ -303,8 +289,8 @@ workflow ctat_mutations_DV {
         if (is_long_reads) {
             call SplitNCigarLongReads {
                 input:
-                input_bam = select_first([MarkDuplicates.bam, AddOrReplaceReadGroups.bam, bam]),
-                input_bam_index = select_first([MarkDuplicates.bai, AddOrReplaceReadGroups.bai, bai]),
+                input_bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, mm2.bam, bam]),
+                input_bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, mm2.bai, bai]),
                 scripts_path = scripts_path,
                 docker = docker,
                 preemptible = preemptible
@@ -331,8 +317,8 @@ workflow ctat_mutations_DV {
 
         call SplitReads {
             input:
-                input_bam = select_first([SplitNCigarLongReads.bam, MarkDuplicates.bam, AddOrReplaceReadGroups.bam]),
-                input_bam_index = select_first([SplitNCigarLongReads.bai, MarkDuplicates.bai, AddOrReplaceReadGroups.bai]),
+                input_bam = select_first([SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam]),
+                input_bam_index = select_first([SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai]),
                 extra_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
                 ref_name = basename(basename(ref_fasta, ".fa"), ".fasta"),
                 extra_fasta_index = CreateFastaIndex.fasta_index,
@@ -389,8 +375,8 @@ workflow ctat_mutations_DV {
         # Determine BAM for variant calling based on read type and preprocessing
         # For Illumina: MarkDuplicates -> DeepVariant (no SplitNCigarReads needed)
         # For PacBio: SplitNCigarLongReads -> flagCorrection -> DeepVariant
-        File bam_for_variant_calls = select_first([SplitReads.ref_bam, flagCorrection.bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, AddOrReplaceReadGroups.bam, bam])
-        File bai_for_variant_calls = select_first([SplitReads.ref_bai, flagCorrection.bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, AddOrReplaceReadGroups.bai, bai])
+        File bam_for_variant_calls = select_first([SplitReads.ref_bam, flagCorrection.bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
+        File bai_for_variant_calls = select_first([SplitReads.ref_bai, flagCorrection.bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
 
         # DeepVariant variant calling workflow with built-in parallelization via sharding
         scatter (shard_idx in range(deepvariant_shards)) {
@@ -467,8 +453,8 @@ workflow ctat_mutations_DV {
                     gnomad_vcf_index=gnomad_vcf_index,
                     rna_editing_vcf=rna_editing_vcf,
                     rna_editing_vcf_index=rna_editing_vcf_index,
-                    bam = select_first([MarkDuplicates.bam, AddOrReplaceReadGroups.bam, StarAlign.bam, bam]),
-                    bam_index = select_first([MarkDuplicates.bai, AddOrReplaceReadGroups.bai, StarAlign.bai, bai]),
+                    bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
+                    bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
                     include_read_var_pos_annotations=include_read_var_pos_annotations,
                     repeat_mask_bed=repeat_mask_bed,
                     ref_splice_adj_regions_bed=ref_splice_adj_regions_bed,
@@ -527,8 +513,8 @@ workflow ctat_mutations_DV {
                             ref_fasta = ref_fasta,
                             ref_fasta_index = ref_fasta_index,
                             ref_bed = select_first([ref_bed]),
-                            bam=select_first([MarkDuplicates.bam, AddOrReplaceReadGroups.bam, StarAlign.bam, bam]),
-                            bai=select_first([MarkDuplicates.bai, AddOrReplaceReadGroups.bai, StarAlign.bai, bai]),
+                            bam=select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
+                            bai=select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
                             docker = docker,
                             preemptible = preemptible
                     }
@@ -690,48 +676,6 @@ task MarkDuplicates {
     }
 
 }
-
-task AddOrReplaceReadGroups {
-    input {
-        File input_bam
-        String sequencing_platform
-        String base_name
-        String docker
-        Int preemptible
-        String sample_id
-    }
-    String unique_id = sub(sample_id, "\\.", "_")
-
-    command <<<
-        set -e
-        # monitor_script.sh &
-
-        picard AddOrReplaceReadGroups \
-        INPUT=~{input_bam} \
-        OUTPUT=~{base_name}.sorted.bam \
-        SORT_ORDER=coordinate \
-        RGID=id \
-        RGLB=library \
-        RGPL=~{sequencing_platform} \
-        RGPU=machine \
-        RGSM=~{unique_id}
-
-        samtools index "~{base_name}.sorted.bam"
-    >>>
-
-    output {
-        File bam = "~{base_name}.sorted.bam"
-        File bai = "~{base_name}.sorted.bam.bai"
-    }
-
-    runtime {
-        memory: "1G"
-        disks: "local-disk " + ceil((size(input_bam, "GB") * 3) + 30) + " HDD"
-        docker: docker
-        preemptible: preemptible
-    }
-}
-
 
 task StarAlign {
     input {
@@ -909,6 +853,7 @@ task DeepVariant_make_examples {
             --mode calling \
             --ref ~{ref_fasta} \
             --reads ~{input_bam} \
+            --sample_name ~{sample_name} \
             --examples examples.tfrecord@~{num_shards}.gz \
             --task ~{task_idx} \
             ~{"--regions " + intervals} \
