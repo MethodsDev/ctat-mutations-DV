@@ -609,8 +609,8 @@ task annotate_PASS_reads {
         set -ex
 
         echo "######## Annotate PASS Reads #########"
-      
-        samtools index ~{bam}
+
+        # Note: bam_index is already provided as input, no need to regenerate
 
         ~{scripts_path}/annotate_PASS_reads.extract_sc_info.py \
             --vcf ~{input_vcf}  \

@@ -11,6 +11,12 @@
   - open-cravat uses chardet.universaldetector.UniversalDetector() which was removed in chardet 5.0+
   - Docker/Dockerfile line 66
 
+- **Fixed annotate_PASS_reads BAM indexing issue**: Removed unnecessary `samtools index` call
+  - Task was trying to regenerate BAM index in read-only inputs directory
+  - BAM index is already provided as input parameter, no need to regenerate
+  - Caused `samtools index: failed to create or write index` error
+  - WDL/subworkflows/annotate_variants.wdl line 613
+
 - **Disabled open-cravat by default**: Set incl_cravat=false to avoid SQLite locking issues
   - open-cravat's tagsampler postaggregator requires write access to genome library database
   - Genome libraries are mounted read-only in Docker, causing `sqlite3.OperationalError: database is locked`
@@ -22,10 +28,12 @@
   - Added: testing/example.*, testing/cromwell-executions, testing/*.log, testing/__pycache__
 
 ### Verified Functionality
-- Complete pipeline execution without open-cravat
-- All remaining annotations functional: snpEff, dbSNP, gnomAD, COSMIC, RNA editing, repeats, homopolymers, splice distance, PASS reads
-- IGV HTML report generation successful
-- Test dataset (reads_1.fastq.gz + reads_2.fastq.gz) completes in ~25 minutes
+- ✅ Complete Illumina short-read pipeline (reads_1.fastq.gz + reads_2.fastq.gz) - ~25 minutes
+- ✅ Complete PacBio long-read pipeline (UHR.pbio.fq.gz) - ~26 minutes
+- ✅ DeepVariant variant calling with correct channel configuration (6 for Illumina, 9 for PacBio)
+- ✅ All annotations functional: snpEff, dbSNP, gnomAD, COSMIC, RNA editing, repeats, homopolymers, splice distance, PASS reads
+- ✅ IGV HTML report generation successful
+- ✅ flagCorrection integration for long reads (pass-through mode)
 
 ---
 
