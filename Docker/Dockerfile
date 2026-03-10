@@ -176,31 +176,16 @@ RUN wget -q https://github.com/attractivechaos/k8/releases/download/v${K8_VERSIO
 ENV PATH=/usr/local/src/ctat-mutations/WDL/:/usr/local/src/ctat-mutations/src/:$PATH
 
 
-## NCIP CTAT mutations v5.0.0
+## MethodsDev CTAT mutations DV v5.0.0
 WORKDIR $SRC
-ENV CTAT_MUTATIONS_TAG=v5.0.0
-# Note: Update commit hash after tagging v5.0.0 release
-# ENV CTAT_MUTATIONS_COMMIT=<commit_hash_here>
+ENV CTAT_MUTATIONS_VERSION=5.0.0
+ENV CTAT_MUTATIONS_COMMIT=864ec3db423ef8aabeba85a463db02a18a7f01de
 
-# For now, use local code during development
-# Once v5.0.0 is tagged and released, uncomment below:
-# RUN git clone https://github.com/NCIP/ctat-mutations.git && \
-#     cd ctat-mutations && \
-#     git checkout $CTAT_MUTATIONS_TAG && \
-#     git submodule init && git submodule update && \
-#     git submodule foreach --recursive git submodule init && \
-#     git submodule foreach --recursive git submodule update && \
-#     make
-
-# Temporary: Copy local code for development/testing
-# Note: Build context is parent directory
-COPY . /usr/local/src/ctat-mutations/
-WORKDIR /usr/local/src/ctat-mutations
-RUN if [ -d .git ]; then \
-        git submodule init && git submodule update && \
-        git submodule foreach --recursive git submodule init && \
-        git submodule foreach --recursive git submodule update; \
-    fi && \
+# Clone from GitHub using specific commit
+RUN git clone --recursive https://github.com/MethodsDev/ctat-mutations-DV.git ctat-mutations && \
+    cd ctat-mutations && \
+    git checkout $CTAT_MUTATIONS_COMMIT && \
+    git submodule update --init --recursive && \
     cd plugins/bamsifter/htslib && autoreconf -i && cd /usr/local/src/ctat-mutations && \
     make
 
