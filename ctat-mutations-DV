@@ -342,9 +342,9 @@ def main():
     input_json["genome_version"] = genome_version
     input_json["sample_id"] = sample_id
     if left is not None:
-        input_json["left"] = left
+        input_json["fastq_left"] = left
     if right is not None:
-        input_json["right"] = right
+        input_json["fastq_right"] = right
     if bam is not None:
         input_json["bam"] = bam
         if not os.path.exists(bam):
@@ -424,8 +424,8 @@ def main():
     input_json["deepvariant_min_dp"] = deepvariant_min_dp
 
     input_json["docker"] = "trinityctat/ctat_mutations:5.0.0"
-    # Using DeepVariant v1.4.0 to match RNA-seq model version
-    input_json["deepvariant_docker"] = "google/deepvariant:1.4.0"
+    # Using DeepVariant v1.9.0 (RNA-seq model from v1.4.0 is still compatible)
+    input_json["deepvariant_docker"] = "google/deepvariant:1.9.0"
     input_json["variant_scatter_count"] = variant_scatter_count
 
     # Disable time-consuming annotations that aren't essential
