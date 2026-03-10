@@ -8,9 +8,11 @@ workflow ctat_mutations_DV_Terra_hg19 {
 
   input {
     String docker = "trinityctat/ctat_mutations_dv:latest"
+    String deepvariant_docker = "google/deepvariant:1.9.0"
+    String deepvariant_docker_gpu = "google/deepvariant:1.9.0-gpu"
     String sample_id
-    File? left
-    File? right
+    File? fastq_left
+    File? fastq_right
     File? bam
     File? bai
     File? intervals
@@ -48,9 +50,11 @@ workflow ctat_mutations_DV_Terra_hg19 {
 
     input:
       docker = docker,
+      deepvariant_docker = deepvariant_docker,
+      deepvariant_docker_gpu = deepvariant_docker_gpu,
       sample_id = sample_id,
-      left = left,
-      right = right,
+      fastq_left = fastq_left,
+      fastq_right = fastq_right,
       bam = bam,
       bai = bai,
       intervals = intervals,

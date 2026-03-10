@@ -57,13 +57,10 @@ workflow annotate_variants_wf {
         Int cpu
     }
 
-
-    Boolean vcf_input = defined(vcf)
-
     parameter_meta {
 
-        left:{help:"One of the two paired RNAseq samples"}
-        right:{help:"One of the two paired RNAseq samples"}
+        fastq_left:{help:"One of the two paired RNAseq samples"}
+        fastq_right:{help:"One of the two paired RNAseq samples"}
         bam:{help:"Previously aligned bam file. When VCF is provided, the output from ApplyBQSR should be provided as the bam input."}
         bai:{help:"Previously aligned bam index file"}
         vcf:{help:"Previously generated vcf file to annotate and filter. When provided, the output from ApplyBQSR should be provided as the bam input."}
@@ -386,7 +383,6 @@ task snpEff {
         File input_vcf_index
         String base_name
         String scripts_path
-        String base_name
         String plugins_path
         String genome_version
 

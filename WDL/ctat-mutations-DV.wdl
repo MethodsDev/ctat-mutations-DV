@@ -8,8 +8,8 @@ workflow ctat_mutations_DV {
         String sample_id
 
         # different entry points based on inputs
-        File? left
-        File? right
+        File? fastq_left
+        File? fastq_right
         File? bam
         File? bai
         File? vcf
@@ -78,10 +78,10 @@ workflow ctat_mutations_DV {
         Boolean normalize_bam = true
 
         # DeepVariant configuration
-        # Using v1.4.0 to match RNA-seq model version (last RNA model update was v1.4.0)
+        # Using v1.9.0 (RNA-seq model from v1.4.0 is still compatible)
         Boolean deepvariant_use_gpu = false
-        String deepvariant_docker = "google/deepvariant:1.4.0"
-        String deepvariant_docker_gpu = "google/deepvariant:1.4.0-gpu"
+        String deepvariant_docker = "google/deepvariant:1.9.0"
+        String deepvariant_docker_gpu = "google/deepvariant:1.9.0-gpu"
         Int deepvariant_shards = 18
         Boolean output_gvcf = false
         Int deepvariant_min_gq = 18
@@ -125,8 +125,8 @@ workflow ctat_mutations_DV {
 
     parameter_meta {
 
-        left:{help:"One of the two paired RNAseq samples"}
-        right:{help:"One of the two paired RNAseq samples"}
+        fastq_left:{help:"One of the two paired RNAseq samples"}
+        fastq_right:{help:"One of the two paired RNAseq samples"}
         bam:{help:"Previously aligned bam file."}
         bai:{help:"Previously aligned bam index file"}
         vcf:{help:"Previously generated vcf file to annotate and filter."}
@@ -206,7 +206,7 @@ workflow ctat_mutations_DV {
                     sample_id=sample_id,
                     mm2_genome_idx = mm2_genome_idx,
                     mm2_splice_bed = mm2_splice_bed,
-                    reads = left,
+                    reads = fastq_left,
                     
                     extra_disk_space = star_extra_disk_space,
                     fastq_disk_space_multiplier = star_fastq_disk_space_multiplier,
@@ -225,8 +225,8 @@ workflow ctat_mutations_DV {
                 input:
                     star_reference = star_reference,
                     star_reference_dir = star_reference_dir,
-                    fastq1 = left,
-                    fastq2 = right,
+                    fastq1 = fastq_left,
+                    fastq2 = fastq_right,
                     output_unmapped_reads = output_unmapped_reads,
                     genomeFastaFiles=extra_fasta,
                     STAR_limitBAMsortRAM=star_limitBAMsortRAM,
@@ -340,7 +340,7 @@ workflow ctat_mutations_DV {
                 docker = docker,
                 preemptible = preemptible
         }
-        if(SplitReads.extra_bam_number_of_reads > 0) {
+        if(select_first([SplitReads.extra_bam_number_of_reads, 0]) > 0) {
             # DeepVariant for extra_fasta reads
             scatter (extra_shard_idx in range(deepvariant_shards)) {
                 call DeepVariant_make_examples as DeepVariant_make_examples_Extra {
@@ -432,7 +432,7 @@ workflow ctat_mutations_DV {
                 preemptible = preemptible
         }
 
-        if(!vcf_input && defined(extra_fasta) && SplitReads.extra_bam_number_of_reads > 0) {
+        if(!vcf_input && defined(extra_fasta) && select_first([SplitReads.extra_bam_number_of_reads, 0]) > 0) {
             call MergeVCFs as MergePrimaryAndExtraVCFs { # combine extra vcf with primary vcf for joint annotating
                 input:
                     input_vcfs = select_all([DeepVariant_postprocess_variants.vcf, DeepVariant_postprocess_variants_Extra.vcf]),
@@ -1109,7 +1109,7 @@ task MergeVCFs {
         Array[File] input_vcfs
         Array[File] input_vcfs_indexes
         String output_vcf_name
-        Int? disk_size = 5
+        Int disk_size = 5
         String docker
         Int preemptible
     }
@@ -1157,7 +1157,7 @@ task MergeRealignedBams {
         Array[File] input_bais
         String output_bam_name
         String output_bai_name
-        Int? disk_size = 100
+        Int disk_size = 100
         String docker
         Int preemptible
     }

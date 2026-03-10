@@ -44,15 +44,17 @@ workflow ctat_mutations_Terra {
 
   input {
     String docker
+    String deepvariant_docker
+    String deepvariant_docker_gpu
     String sample_id
     File? bam
-    File? bai  
-    File? left
-    File? right
+    File? bai
+    File? fastq_left
+    File? fastq_right
     File? intervals
     Boolean is_long_reads = false
     Boolean annotate_variants = true
-    Int? preemptible  
+    Int? preemptible
     Ctat_mutations_config pipe_inputs_config
   }
   
@@ -60,11 +62,13 @@ workflow ctat_mutations_Terra {
 
     input:
       docker = docker,
+      deepvariant_docker = deepvariant_docker,
+      deepvariant_docker_gpu = deepvariant_docker_gpu,
       sample_id = sample_id,
       bam = bam,
       bai = bai,
-      left = left,
-      right = right,
+      fastq_left = fastq_left,
+      fastq_right = fastq_right,
 
       intervals = intervals,
       annotate_variants = annotate_variants,
