@@ -49,7 +49,7 @@ workflow annotate_variants_wf {
 
         String? genome_version
 
-        String docker = "trinityctat/ctat_mutations:latest"
+        String docker = "trinityctat/ctat_mutations_dv:latest"
         String plugins_path = "/usr/local/src/ctat-mutations/plugins"
         String scripts_path = "/usr/local/src/ctat-mutations/src"
 

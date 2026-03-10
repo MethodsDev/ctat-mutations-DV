@@ -9,7 +9,7 @@ workflow ctat_mutations_DV_Terra_hg38 {
 
   input {
 
-    String docker
+    String docker = "trinityctat/ctat_mutations_dv:latest"
     String sample_id
     File? left
     File? right

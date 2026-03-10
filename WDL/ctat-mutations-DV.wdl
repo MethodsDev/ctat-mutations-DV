@@ -110,7 +110,7 @@ workflow ctat_mutations_DV {
         Boolean output_unmapped_reads = false
 
         Int preemptible = 2
-        String docker = "trinityctat/ctat_mutations:latest"
+        String docker = "trinityctat/ctat_mutations_dv:latest"
         Int variant_scatter_count = 6
         String plugins_path = "/usr/local/src/ctat-mutations/plugins"
         String scripts_path = "/usr/local/src/ctat-mutations/src"
