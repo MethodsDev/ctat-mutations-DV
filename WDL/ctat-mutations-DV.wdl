@@ -978,7 +978,7 @@ task DeepVariant_call_variants {
         disks: "local-disk 100 HDD"
         preemptible: 0
         gpuType: if use_gpu then "nvidia-tesla-t4" else ""
-        gpuCount: if use_gpu then 1 else 0
+        gpuCount: 1
     }
 }
 
