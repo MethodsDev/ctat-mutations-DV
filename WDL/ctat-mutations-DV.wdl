@@ -96,7 +96,6 @@ workflow ctat_mutations_DV {
         Boolean incl_homopolymers = true
         Boolean incl_cravat = false  # Disabled due to SQLite locking issues with read-only genome lib mount
         Boolean incl_splice_dist = true
-        Boolean incl_blat_ED = false
         Boolean incl_cosmic = true
 
 
@@ -474,7 +473,6 @@ workflow ctat_mutations_DV {
                     incl_repeats = incl_repeats,
                     incl_homopolymers = incl_homopolymers,
                     incl_splice_dist = incl_splice_dist,
-                    incl_blat_ED = incl_blat_ED,
                     incl_cosmic = incl_cosmic,
                     incl_cravat = incl_cravat,
                     singlecell_mode = singlecell_mode

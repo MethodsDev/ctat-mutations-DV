@@ -32,7 +32,6 @@ workflow ctat_mutations_DV_Terra_hg38 {
     Boolean incl_homopolymers = true
     Boolean incl_splice_dist = true
     Boolean incl_cosmic = true
-    Boolean incl_blat_ED = false
     Boolean include_read_var_pos_annotations = false
     Boolean incl_cravat = false
   
@@ -91,7 +90,6 @@ workflow ctat_mutations_DV_Terra_hg38 {
       incl_homopolymers = incl_homopolymers,
       incl_splice_dist = incl_splice_dist,
       incl_cosmic = incl_cosmic,
-      incl_blat_ED = incl_blat_ED,
       include_read_var_pos_annotations = include_read_var_pos_annotations,
       incl_cravat = incl_cravat
 

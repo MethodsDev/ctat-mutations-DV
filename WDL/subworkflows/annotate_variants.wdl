@@ -22,7 +22,7 @@ workflow annotate_variants_wf {
         Boolean incl_repeats = true
         Boolean incl_homopolymers = true
         Boolean incl_splice_dist = true
-        Boolean incl_blat_ED = true
+
         Boolean incl_cosmic = true
         Boolean incl_cravat = false  # Disabled due to SQLite locking issues with read-only genome lib mount
 
@@ -253,28 +253,11 @@ workflow annotate_variants_wf {
     }
 
 
-    if (incl_blat_ED && ! defined(ExistingAnnots.blat_ED_done) ) {
-        call annotate_blat_ED {
-            input:
-                input_vcf = select_first([annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_splice_distance.vcf_index,  annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
-                ref_fasta = ref_fasta,
-                ref_fasta_index = ref_fasta_index,
-                base_name = base_name,
-                scripts_path = scripts_path,
-                docker = docker,
-                preemptible = preemptible,
-                cpu = cpu
-        }
-
-    }
-
-
     if (incl_cosmic && ! defined(ExistingAnnots.COSMIC_done) ) {
         call annotate_cosmic_variants {
             input:
-                input_vcf = select_first([annotate_blat_ED.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_blat_ED.vcf_index, annotate_splice_distance.vcf_index,  annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]), 
+                input_vcf = select_first([annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+                input_vcf_index = select_first([annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
                 cosmic_vcf = select_first([cosmic_vcf]),
                 cosmic_vcf_index = select_first([cosmic_vcf_index]),
                 base_name = base_name,
@@ -289,8 +272,8 @@ workflow annotate_variants_wf {
          
         call open_cravat {
             input:
-                input_vcf = select_first([annotate_cosmic_variants.vcf, annotate_blat_ED.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_cosmic_variants.vcf_index, annotate_blat_ED.vcf_index, annotate_splice_distance.vcf_index,  annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+                input_vcf = select_first([annotate_cosmic_variants.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+                input_vcf_index = select_first([annotate_cosmic_variants.vcf_index, annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
                 cravat_lib_tar_gz = cravat_lib_tar_gz,
                 cravat_lib_dir = cravat_lib_dir,
                 genome_version = select_first([genome_version]),
@@ -304,8 +287,8 @@ workflow annotate_variants_wf {
 
     call rename_vcf {
         input:
-            input_vcf = select_first([open_cravat.vcf, annotate_cosmic_variants.vcf, annotate_blat_ED.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-            input_vcf_index = select_first([open_cravat.vcf_index, annotate_cosmic_variants.vcf_index, annotate_blat_ED.vcf_index, annotate_splice_distance.vcf_index,  annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+            input_vcf = select_first([open_cravat.vcf, annotate_cosmic_variants.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+            input_vcf_index = select_first([open_cravat.vcf_index, annotate_cosmic_variants.vcf_index, annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
             base_name = base_name,
             docker=docker,
             preemptible=preemptible
@@ -799,63 +782,6 @@ task annotate_splice_distance {
 }    
 
 
-task annotate_blat_ED {
-
-    input {
-        File input_vcf
-        File input_vcf_index
-
-        File ref_fasta
-        File ref_fasta_index
-
-        String base_name
-        String scripts_path
-
-        String docker
-        Int preemptible
-        Int cpu
-        Int disk = ceil((size(input_vcf, "GB") * 3) + 200)
-
-    }
-
-
-    command <<<
-
-        set -ex
-      
-        echo "########### Annotate BLAT ED #############"
-      
-        if [ ! -d tmpdir ]; then
-            mkdir tmpdir
-        fi
-
-        ~{scripts_path}/annotate_ED.py \
-            --input_vcf ~{input_vcf} \
-            --output_vcf ~{base_name}.blat_ED.vcf \
-            --reference ~{ref_fasta} \
-            --temp_dir tmpdir \
-            --threads ~{cpu}
-
-            bgzip -c ~{base_name}.blat_ED.vcf > ~{base_name}.blat_ED.vcf.gz
-            tabix ~{base_name}.blat_ED.vcf.gz
-
-    >>>
-
-
-    output {
-        File vcf = "~{base_name}.blat_ED.vcf.gz"
-        File vcf_index = "~{base_name}.blat_ED.vcf.gz.tbi"
-    }
-
-    runtime {
-        disks: "local-disk " + disk + " HDD"
-        docker: docker
-        memory: "40G"
-        preemptible: preemptible
-        cpu : cpu
-    }
-
-}    
 
 
 
@@ -1112,9 +1038,6 @@ task examine_existing_annotations {
         if re.search("##INFO=<ID=DJ,", header) is not None:
             checkpoints.append("splice_dist.done")
 
-        if re.search("##INFO=<ID=ED,", header) is not None:
-            checkpoints.append("blat_ED.done")
-
         if re.search("##INFO=<ID=COSMIC_ID,", header) is not None:
             checkpoints.append("COSMIC.done")
 
@@ -1148,7 +1071,6 @@ task examine_existing_annotations {
         File? repeats_done = "repeats.done"
         File? homopolymer_done = "homopolymer.done"
         File? splice_dist_done = "splice_dist.done"
-        File? blat_ED_done = "blat_ED.done"
         File? COSMIC_done = "COSMIC.done"
         File? CRAVAT_done = "CRAVAT.done"
 
