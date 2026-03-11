@@ -54,6 +54,7 @@ workflow ctat_mutations_Terra {
     File? intervals
     Boolean is_long_reads = false
     Boolean annotate_variants = true
+    Boolean singlecell_mode = false
     Int? preemptible
     Ctat_mutations_config pipe_inputs_config
 
@@ -85,6 +86,7 @@ workflow ctat_mutations_Terra {
 
       intervals = intervals,
       annotate_variants = annotate_variants,
+      singlecell_mode = singlecell_mode,
 
       is_long_reads = is_long_reads,
 
