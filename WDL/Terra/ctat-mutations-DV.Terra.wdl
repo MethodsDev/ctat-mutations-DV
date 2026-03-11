@@ -56,6 +56,19 @@ workflow ctat_mutations_Terra {
     Boolean annotate_variants = true
     Int? preemptible
     Ctat_mutations_config pipe_inputs_config
+
+    # annotation toggles
+    Boolean incl_snpEff = true
+    Boolean incl_dbsnp = true
+    Boolean incl_gnomad = true
+    Boolean incl_rna_editing = true
+    Boolean incl_repeats = true
+    Boolean incl_homopolymers = true
+    Boolean incl_splice_dist = true
+    Boolean incl_cosmic = true
+    Boolean incl_blat_ED = false
+    Boolean include_read_var_pos_annotations = false
+    Boolean incl_cravat = false
   }
   
   call CTAT_Mutations_wf.ctat_mutations_DV as CM_wf {
@@ -95,7 +108,19 @@ workflow ctat_mutations_Terra {
       mm2_genome_idx = pipe_inputs_config.mm2_genome_idx,
       mm2_splice_bed = pipe_inputs_config.mm2_splice_bed,
 
-      preemptible = preemptible
+      preemptible = preemptible,
+
+      incl_snpEff = incl_snpEff,
+      incl_dbsnp = incl_dbsnp,
+      incl_gnomad = incl_gnomad,
+      incl_rna_editing = incl_rna_editing,
+      incl_repeats = incl_repeats,
+      incl_homopolymers = incl_homopolymers,
+      incl_splice_dist = incl_splice_dist,
+      incl_cosmic = incl_cosmic,
+      incl_blat_ED = incl_blat_ED,
+      include_read_var_pos_annotations = include_read_var_pos_annotations,
+      incl_cravat = incl_cravat
    }
 
 

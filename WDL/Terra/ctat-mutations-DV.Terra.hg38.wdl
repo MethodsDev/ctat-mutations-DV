@@ -21,7 +21,20 @@ workflow ctat_mutations_DV_Terra_hg38 {
     File? intervals
     Boolean annotate_variants = true
     Boolean is_long_reads = false
-    Int? preemptible  
+    Int? preemptible
+
+    # annotation toggles
+    Boolean incl_snpEff = true
+    Boolean incl_dbsnp = true
+    Boolean incl_gnomad = true
+    Boolean incl_rna_editing = true
+    Boolean incl_repeats = true
+    Boolean incl_homopolymers = true
+    Boolean incl_splice_dist = true
+    Boolean incl_cosmic = true
+    Boolean incl_blat_ED = false
+    Boolean include_read_var_pos_annotations = false
+    Boolean incl_cravat = false
   
 
 	String gs_base_url = "gs://mdl-ctat-genome-libs/__genome_libs_StarFv1.10/GRCh38_gencode_v22_CTAT_lib_Mar012021.plug-n-play"
@@ -68,8 +81,19 @@ workflow ctat_mutations_DV_Terra_hg38 {
       annotate_variants = annotate_variants,
       is_long_reads = is_long_reads,
       pipe_inputs_config = pipe_inputs_config,
+      preemptible = preemptible,
 
-      preemptible = preemptible
+      incl_snpEff = incl_snpEff,
+      incl_dbsnp = incl_dbsnp,
+      incl_gnomad = incl_gnomad,
+      incl_rna_editing = incl_rna_editing,
+      incl_repeats = incl_repeats,
+      incl_homopolymers = incl_homopolymers,
+      incl_splice_dist = incl_splice_dist,
+      incl_cosmic = incl_cosmic,
+      incl_blat_ED = incl_blat_ED,
+      include_read_var_pos_annotations = include_read_var_pos_annotations,
+      incl_cravat = incl_cravat
 
   }
 
