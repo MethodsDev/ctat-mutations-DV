@@ -45,7 +45,8 @@ workflow ctat_mutations_Terra {
   input {
     String docker
     String deepvariant_docker
-    String deepvariant_docker_gpu
+    String deepvariant_docker_gpu = "google/deepvariant:1.10.0-gpu"
+    Boolean deepvariant_use_gpu = false
     String sample_id
     File? bam
     File? bai
@@ -64,6 +65,7 @@ workflow ctat_mutations_Terra {
       docker = docker,
       deepvariant_docker = deepvariant_docker,
       deepvariant_docker_gpu = deepvariant_docker_gpu,
+      deepvariant_use_gpu = deepvariant_use_gpu,
       sample_id = sample_id,
       bam = bam,
       bai = bai,

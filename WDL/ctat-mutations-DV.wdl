@@ -78,10 +78,10 @@ workflow ctat_mutations_DV {
         Boolean normalize_bam = true
 
         # DeepVariant configuration
-        # Using v1.9.0 (RNA-seq model from v1.4.0 is still compatible)
+        # Using v1.10.0 with run_deepvariant wrapper (handles make_examples/call_variants/postprocess_variants internally)
         Boolean deepvariant_use_gpu = false
-        String deepvariant_docker = "google/deepvariant:1.9.0"
-        String deepvariant_docker_gpu = "google/deepvariant:1.9.0-gpu"
+        String deepvariant_docker = "google/deepvariant:1.10.0"
+        String deepvariant_docker_gpu = "google/deepvariant:1.10.0-gpu"
         Int deepvariant_shards = 18
         Boolean output_gvcf = false
         Int deepvariant_min_gq = 18
@@ -176,8 +176,8 @@ workflow ctat_mutations_DV {
 
         include_read_var_pos_annotations :{help: "Add vcf annotation that requires variant to be at least 6 bases from ends of reads."}
 
-        deepvariant_use_gpu:{help:"Use GPU acceleration for DeepVariant call_variants step"}
-        deepvariant_shards:{help:"Number of shards for DeepVariant make_examples parallelization"}
+        deepvariant_use_gpu:{help:"Use GPU acceleration for DeepVariant (requires GPU-enabled machine on Terra)"}
+        deepvariant_shards:{help:"Number of shards for DeepVariant parallelization"}
         output_gvcf:{help:"Output gVCF file in addition to VCF"}
         deepvariant_min_gq:{help:"Minimum genotype quality (GQ) for DeepVariant filtering. Recommended: 18 for high precision."}
         deepvariant_min_qual:{help:"Minimum QUAL score for DeepVariant filtering"}
@@ -342,42 +342,20 @@ workflow ctat_mutations_DV {
         }
         if(select_first([SplitReads.extra_bam_number_of_reads, 0]) > 0) {
             # DeepVariant for extra_fasta reads
-            scatter (extra_shard_idx in range(deepvariant_shards)) {
-                call DeepVariant_make_examples as DeepVariant_make_examples_Extra {
-                    input:
-                        input_bam = SplitReads.extra_bam,
-                        input_bam_index = SplitReads.extra_bai,
-                        ref_fasta = select_first([CreateFastaIndex.fasta]),
-                        ref_fasta_index = select_first([CreateFastaIndex.fasta_index]),
-                        sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
-                        task_idx = extra_shard_idx,
-                        num_shards = deepvariant_shards,
-                        intervals = intervals,
-                        is_long_reads = is_long_reads,
-                        docker = deepvariant_docker,
-                        preemptible = preemptible
-                }
-            }
-
-            call DeepVariant_call_variants as DeepVariant_call_variants_Extra {
+            call DeepVariant as DeepVariant_Extra {
                 input:
-                    examples = DeepVariant_make_examples_Extra.examples,
-                    sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
-                    is_long_reads = is_long_reads,
-                    use_gpu = deepvariant_use_gpu,
-                    docker = deepvariant_docker,
-                    docker_gpu = deepvariant_docker_gpu,
-                    preemptible = 0
-            }
-
-            call DeepVariant_postprocess_variants as DeepVariant_postprocess_variants_Extra {
-                input:
-                    call_variants_output = DeepVariant_call_variants_Extra.call_variants_output,
+                    input_bam = select_first([SplitReads.extra_bam]),
+                    input_bam_index = select_first([SplitReads.extra_bai]),
                     ref_fasta = select_first([CreateFastaIndex.fasta]),
                     ref_fasta_index = select_first([CreateFastaIndex.fasta_index]),
                     sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
+                    is_long_reads = is_long_reads,
                     output_gvcf = output_gvcf,
+                    intervals = intervals,
+                    num_shards = deepvariant_shards,
+                    use_gpu = deepvariant_use_gpu,
                     docker = deepvariant_docker,
+                    docker_gpu = deepvariant_docker_gpu,
                     preemptible = preemptible
             }
         }
@@ -392,50 +370,28 @@ workflow ctat_mutations_DV {
         File bam_for_variant_calls = select_first([SplitReads.ref_bam, flagCorrection.bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
         File bai_for_variant_calls = select_first([SplitReads.ref_bai, flagCorrection.bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
 
-        # DeepVariant variant calling workflow with built-in parallelization via sharding
-        scatter (shard_idx in range(deepvariant_shards)) {
-            call DeepVariant_make_examples {
-                input:
-                    input_bam = bam_for_variant_calls,
-                    input_bam_index = bai_for_variant_calls,
-                    ref_fasta = ref_fasta,
-                    ref_fasta_index = ref_fasta_index,
-                    sample_name = sample_id,
-                    task_idx = shard_idx,
-                    num_shards = deepvariant_shards,
-                    intervals = intervals,
-                    is_long_reads = is_long_reads,
-                    docker = deepvariant_docker,
-                    preemptible = preemptible
-            }
-        }
-
-        call DeepVariant_call_variants {
+        # DeepVariant variant calling (run_deepvariant handles sharding internally)
+        call DeepVariant {
             input:
-                examples = DeepVariant_make_examples.examples,
-                sample_name = sample_id,
-                is_long_reads = is_long_reads,
-                use_gpu = deepvariant_use_gpu,
-                docker = deepvariant_docker,
-                docker_gpu = deepvariant_docker_gpu,
-                preemptible = 0
-        }
-
-        call DeepVariant_postprocess_variants {
-            input:
-                call_variants_output = DeepVariant_call_variants.call_variants_output,
+                input_bam = bam_for_variant_calls,
+                input_bam_index = bai_for_variant_calls,
                 ref_fasta = ref_fasta,
                 ref_fasta_index = ref_fasta_index,
                 sample_name = sample_id,
+                is_long_reads = is_long_reads,
                 output_gvcf = output_gvcf,
+                intervals = intervals,
+                num_shards = deepvariant_shards,
+                use_gpu = deepvariant_use_gpu,
                 docker = deepvariant_docker,
+                docker_gpu = deepvariant_docker_gpu,
                 preemptible = preemptible
         }
 
         if(!vcf_input && defined(extra_fasta) && select_first([SplitReads.extra_bam_number_of_reads, 0]) > 0) {
             call MergeVCFs as MergePrimaryAndExtraVCFs { # combine extra vcf with primary vcf for joint annotating
                 input:
-                    input_vcfs = select_all([DeepVariant_postprocess_variants.vcf, DeepVariant_postprocess_variants_Extra.vcf]),
+                    input_vcfs = select_all([DeepVariant.vcf, DeepVariant_Extra.vcf]),
                     input_vcfs_indexes = [],
                     output_vcf_name = sample_id + ".and.extra.vcf.gz",
                     docker = docker,
@@ -444,8 +400,8 @@ workflow ctat_mutations_DV {
         }
      }
 
-     File variant_vcf = select_first([MergePrimaryAndExtraVCFs.output_vcf, DeepVariant_postprocess_variants.vcf, vcf])
-     File variant_vcf_index = select_first([MergePrimaryAndExtraVCFs.output_vcf_index, DeepVariant_postprocess_variants.vcf_index, vcf_index])
+     File variant_vcf = select_first([MergePrimaryAndExtraVCFs.output_vcf, DeepVariant.vcf, vcf])
+     File variant_vcf_index = select_first([MergePrimaryAndExtraVCFs.output_vcf_index, DeepVariant.vcf_index, vcf_index])
      File realigned_bam = select_first([bam_for_variant_calls, bam])
      File realigned_bai = select_first([bai_for_variant_calls, bai])
 
@@ -540,7 +496,7 @@ workflow ctat_mutations_DV {
     output {
         File? deepvariant_vcf = variant_vcf
         File? deepvariant_vcf_index = variant_vcf_index
-        Array[File]? deepvariant_gvcf = DeepVariant_postprocess_variants.gvcf_files
+        Array[File]? deepvariant_gvcf = DeepVariant.gvcf_files
         File? variant_calling_bam = realigned_bam
         File? variant_calling_bai = realigned_bai
         File? annotated_vcf = AnnotateVariants.vcf
@@ -878,139 +834,42 @@ task Minimap2_align {
 }
 
 
-task DeepVariant_make_examples {
+task DeepVariant {
     input {
         File input_bam
         File input_bam_index
         File ref_fasta
         File ref_fasta_index
         String sample_name
-        Int task_idx
-        Int num_shards
-        File? intervals
         Boolean is_long_reads
-        String docker
-        Int preemptible
-        Int cpu = 2
-        Float memory = 8
-    }
-
-    # RNA-seq specific: Illumina uses default 6 channels (compatible with RNA model), PacBio uses 9 channels
-    # Default 6 channels: read_base,base_quality,mapping_quality,strand,read_supports_variant,base_differs_from_ref
-    # PacBio adds haplotype channel and uses alt_aligned_pileup=diff_channels for 9 channels total
-    # Note: DeepVariant 1.9.0+ uses --channel_list with haplotype instead of deprecated --add_hp_channel
-    String channel_list = if is_long_reads then "read_base,base_quality,mapping_quality,strand,read_supports_variant,base_differs_from_ref,haplotype" else "read_base,base_quality,mapping_quality,strand,read_supports_variant,base_differs_from_ref"
-    String extra_args = if is_long_reads then "--alt_aligned_pileup=diff_channels --realign_reads=false --vsc_min_fraction_indels=0.12" else ""
-
-    command <<<
-        set -ex
-
-        /opt/deepvariant/bin/make_examples \
-            --mode calling \
-            --ref ~{ref_fasta} \
-            --reads ~{input_bam} \
-            --sample_name ~{sample_name} \
-            --examples examples.tfrecord@~{num_shards}.gz \
-            --task ~{task_idx} \
-            --channel_list ~{channel_list} \
-            ~{"--regions " + intervals} \
-            ~{extra_args}
-    >>>
-
-    output {
-        File examples = glob("examples.tfrecord-*-of-*.gz")[0]
-    }
-
-    runtime {
-        docker: docker
-        cpu: cpu
-        memory: memory + " GB"
-        disks: "local-disk " + ceil(size(input_bam, "GB") * 2 + 50) + " HDD"
-        preemptible: preemptible
-    }
-}
-
-
-task DeepVariant_call_variants {
-    input {
-        Array[File] examples
-        String sample_name
-        Boolean is_long_reads
+        Boolean output_gvcf = false
         Boolean use_gpu = false
+        File? intervals
+        Int num_shards = 18
         String docker
-        String docker_gpu
-        Int cpu = 8
-        Float memory = 16
+        String docker_gpu = "google/deepvariant:1.10.0-gpu"
         Int preemptible
+        Int cpu = 18
+        Float memory = 36
     }
 
+    String model_type = if is_long_reads then "MASSEQ" else "RNASEQ"
     String docker_image = if use_gpu then docker_gpu else docker
 
-    # For Illumina RNA-seq: use RNA-seq customized model (v1.4.0)
-    # For PacBio: use PACBIO model
-    String model_type = if is_long_reads then "PACBIO" else "WES"
-    String model_path = if is_long_reads then "/opt/models/pacbio/model.ckpt" else "/opt/models/rnaseq/model.ckpt"
-
     command <<<
         set -ex
 
-        # Copy all example shards to working directory so DeepVariant can glob them
-        mkdir -p examples_dir
-        for example_file in ~{sep=" " examples}; do
-            cp "$example_file" examples_dir/
-        done
-
-        # Use glob pattern for DeepVariant call_variants
-        /opt/deepvariant/bin/call_variants \
-            --outfile call_variants_output.tfrecord.gz \
-            --examples "examples_dir/examples.tfrecord-*-of-*.gz" \
-            --checkpoint ~{model_path}
-    >>>
-
-    output {
-        File call_variants_output = "call_variants_output.tfrecord.gz"
-    }
-
-    runtime {
-        docker: docker_image
-        cpu: cpu
-        memory: memory + " GB"
-        disks: "local-disk 100 HDD"
-        preemptible: 0
-        gpuType: if use_gpu then "nvidia-tesla-t4" else ""
-        gpuCount: 1
-    }
-}
-
-
-task DeepVariant_postprocess_variants {
-    input {
-        File call_variants_output
-        File ref_fasta
-        File ref_fasta_index
-        String sample_name
-        Boolean output_gvcf = false
-        String docker
-        Int preemptible
-        Int cpu = 2
-        Float memory = 8
-    }
-
-    command <<<
-        set -ex
-
-        /opt/deepvariant/bin/postprocess_variants \
-            --ref ~{ref_fasta} \
-            --infile ~{call_variants_output} \
-            --outfile ~{sample_name}.vcf.gz \
-            ~{if output_gvcf then "--gvcf_outfile " + sample_name + ".g.vcf.gz" else ""}
-
-        tabix -f -p vcf ~{sample_name}.vcf.gz
-
-        # Create a marker file if gvcf was requested
-        if [ "~{output_gvcf}" == "true" ]; then
-            touch gvcf.created
-        fi
+        /opt/deepvariant/bin/run_deepvariant \
+            --model_type=~{model_type} \
+            --ref=~{ref_fasta} \
+            --reads=~{input_bam} \
+            --output_vcf=~{sample_name}.vcf.gz \
+            --sample_name=~{sample_name} \
+            --disable_small_model \
+            --num_shards=~{num_shards} \
+            ~{if output_gvcf then "--output_gvcf=" + sample_name + ".g.vcf.gz" else ""} \
+            ~{"--regions=" + intervals} \
+            --intermediate_results_dir=intermediate_results
     >>>
 
     output {
@@ -1020,11 +879,13 @@ task DeepVariant_postprocess_variants {
     }
 
     runtime {
-        docker: docker
+        docker: docker_image
         cpu: cpu
         memory: memory + " GB"
-        disks: "local-disk 50 HDD"
+        disks: "local-disk " + ceil(size(input_bam, "GB") * 2 + 100) + " HDD"
         preemptible: preemptible
+        gpuType: if use_gpu then "nvidia-tesla-t4" else ""
+        gpuCount: if use_gpu then 1 else 0
     }
 }
 

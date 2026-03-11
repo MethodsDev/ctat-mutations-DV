@@ -8,7 +8,7 @@ RNA-seq variant calling pipeline using DeepVariant with state-of-the-art accurac
 
 CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
 
-- **Variant Calling**: Uses Google DeepVariant v1.9.0 with official RNA-seq model (trained on GTEx data)
+- **Variant Calling**: Uses Google DeepVariant v1.10.0 with native RNA-seq model
 - **Alignment**: Supports STAR (Illumina short reads) and Minimap2 (PacBio/ONT long reads)
 - **Annotation**: Integrates dbSNP, gnomAD, COSMIC, CRAVAT, and custom RNA-specific annotations
 - **Filtering**: Quality-based filtering using DeepVariant's neural network scores
@@ -18,10 +18,10 @@ CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
 
 ### Major Changes
 
-- **DeepVariant Integration**: Replaced GATK HaplotypeCaller with DeepVariant v1.9.0
-  - 12% error reduction for Illumina RNA-seq
-  - 30% error reduction for PacBio long reads
-  - 25% faster overall execution
+- **DeepVariant Integration**: Replaced GATK HaplotypeCaller with DeepVariant v1.10.0
+  - Native RNA-seq model (no longer requires WES model workaround)
+  - Auto-configured model parameters via `model.example_info.json`
+  - Improved multiallelic variant post-processing ("product" method)
   - F1 score 0.933 on CDS regions (vs GATK's lower performance)
 
 - **Simplified Pipeline**:
@@ -31,14 +31,14 @@ CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
   - Streamlined filtering using DeepVariant quality scores (GQ ≥ 18 recommended)
 
 - **RNA-seq Specific Optimizations**:
-  - **Illumina**: DeepVariant handles spliced reads internally with `split_skip_reads=true`
-  - **PacBio**: Uses SplitNCigarReads + flagCorrection preprocessing for best accuracy
+  - **Illumina**: Native RNA-seq model with auto-configured `split_skip_reads` and `min_mapping_quality`
+  - **PacBio**: Uses SplitNCigarReads + flagCorrection preprocessing with MasSeq model
 
 ### Performance
 
 - **Accuracy**: 0.998 SNP precision, 0.989 INDEL precision at GQ ≥ 18
 - **Speed**: 25% faster than v4.x GATK-based pipeline
-- **GPU Support**: Optional 10-100x speedup for variant calling with `--deepvariant_use_gpu`
+- **GPU Support**: Optional GPU acceleration on Terra via `deepvariant_use_gpu` WDL input
 
 ## Quick Start
 
@@ -63,14 +63,7 @@ docker pull trinityctat/ctat_mutations:latest
     --sample_id my_sample \
     --variant_ready_bam
 
-# Enable GPU acceleration (much faster)
-./ctat-mutations-DV \
-    --left reads_R1.fastq.gz \
-    --right reads_R2.fastq.gz \
-    --genome_lib_dir /path/to/ctat_genome_lib \
-    --sample_id my_sample \
-    --deepvariant_use_gpu \
-    --cpu 16
+# GPU acceleration is available on Terra (set deepvariant_use_gpu = true in WDL inputs)
 ```
 
 See the [Wiki](https://github.com/NCIP/ctat-mutations/wiki) for full documentation.
@@ -90,12 +83,12 @@ See the [Wiki](https://github.com/NCIP/ctat-mutations/wiki) for full documentati
 
 ### DeepVariant Configuration
 
-- `--deepvariant_use_gpu`: Enable GPU acceleration (default: false)
-- `--deepvariant_shards`: Parallelization level (default: 18)
+- `--deepvariant_shards`: Internal parallelization level (default: 18)
 - `--output_gvcf`: Generate gVCF output (default: false)
 - `--deepvariant_min_gq`: Minimum genotype quality for filtering (default: 18, recommended)
 - `--deepvariant_min_qual`: Minimum QUAL score (default: 20)
 - `--deepvariant_min_dp`: Minimum depth (default: 5)
+- GPU acceleration is available on Terra via `deepvariant_use_gpu` WDL input
 
 ### General Options
 

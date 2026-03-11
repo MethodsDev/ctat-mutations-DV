@@ -105,16 +105,10 @@ def main():
         )
 
     parser.add_argument(
-        "--deepvariant_use_gpu",
-        action="store_true",
-        help="Use GPU acceleration for DeepVariant call_variants step (much faster)",
-    )
-
-    parser.add_argument(
         "--deepvariant_shards",
         type=int,
         default=18,
-        help="Number of shards for DeepVariant make_examples parallelization",
+        help="Number of shards for DeepVariant parallelization",
     )
 
     parser.add_argument(
@@ -252,7 +246,6 @@ def main():
     no_mark_duplicates = args.no_mark_duplicates
     extra_fasta = args.extra_fasta
     cpu = args.cpu
-    deepvariant_use_gpu = args.deepvariant_use_gpu
     deepvariant_shards = args.deepvariant_shards
     output_gvcf = args.output_gvcf
     deepvariant_min_gq = args.deepvariant_min_gq
@@ -416,7 +409,6 @@ def main():
     input_json["variant_ready_bam"] = variant_ready_bam
     input_json["filter_ready_vcf"] = filter_ready_vcf
 
-    input_json["deepvariant_use_gpu"] = deepvariant_use_gpu
     input_json["deepvariant_shards"] = deepvariant_shards
     input_json["output_gvcf"] = output_gvcf
     input_json["deepvariant_min_gq"] = deepvariant_min_gq
@@ -424,8 +416,8 @@ def main():
     input_json["deepvariant_min_dp"] = deepvariant_min_dp
 
     input_json["docker"] = "trinityctat/ctat_mutations:5.0.0"
-    # Using DeepVariant v1.9.0 (RNA-seq model from v1.4.0 is still compatible)
-    input_json["deepvariant_docker"] = "google/deepvariant:1.9.0"
+    # Using DeepVariant v1.10.0 (native RNA-seq model)
+    input_json["deepvariant_docker"] = "google/deepvariant:1.10.0"
     input_json["variant_scatter_count"] = variant_scatter_count
 
     # Disable time-consuming annotations that aren't essential
