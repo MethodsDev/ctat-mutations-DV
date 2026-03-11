@@ -21,8 +21,6 @@ workflow ctat_mutations_DV {
         # resources - all resources derive from the ctat genome lib.
         File ref_fasta
         File ref_fasta_index
-        File? gtf
-
         # for long reads
         Boolean is_long_reads = false
         File? mm2_genome_idx
@@ -135,7 +133,6 @@ workflow ctat_mutations_DV {
         # resources
         ref_fasta:{help:"Path to the reference genome to use in the analysis pipeline."}
         ref_fasta_index:{help:"Index for ref_fasta"}
-        gtf:{help:"Annotations GTF."}
 
         intervals:{help:"Intervals file to restrict variant calling to. (eg. exome target list file)"}
         
