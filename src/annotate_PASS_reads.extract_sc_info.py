@@ -181,6 +181,14 @@ def worker_evaluate_PASS_reads(vcf_line, bamFile, sc_mode):
         # separate the output
         readname, samflag, readstart, cigar, sequencebases, qualscores = bamfields[0], bamfields[1], bamfields[3], bamfields[5], bamfields[9], bamfields[10]
 
+        if sc_mode:
+            # extract CB and XM tags from optional SAM fields if present
+            opt_fields = {f.split(":")[0]: f.split(":")[2] for f in bamfields[11:] if f.count(":") >= 2}
+            cb = opt_fields.get("CB")
+            xm = opt_fields.get("XM")
+            if cb or xm:
+                readname = "{}^{}^{}".format(cb or "NA", xm or "NA", readname)
+
 
         if sequencebases == "*":
             continue
