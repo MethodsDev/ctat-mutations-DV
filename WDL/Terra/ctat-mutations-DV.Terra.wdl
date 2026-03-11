@@ -5,7 +5,6 @@ import "../ctat-mutations-DV.wdl" as CTAT_Mutations_wf
 
 struct Ctat_mutations_config {
 
-  File gtf
   File ref_bed
   File ref_fasta
   File ref_fasta_index
@@ -77,7 +76,6 @@ workflow ctat_mutations_Terra {
 
       is_long_reads = is_long_reads,
 
-      gtf = pipe_inputs_config.gtf,
       ref_bed = pipe_inputs_config.ref_bed,
       ref_fasta = pipe_inputs_config.ref_fasta,
       ref_fasta_index = pipe_inputs_config.ref_fasta_index,

@@ -29,7 +29,6 @@ workflow ctat_mutations_DV_Terra_hg38 {
 
     Ctat_mutations_config pipe_inputs_config = {
       "genome_version" : "hg38",
-      "gtf" : gs_base_url + "/ref_annot.gtf",
       "ref_bed" : gs_base_url + "/ctat_mutation_lib/refGene.sort.bed.gz",
       "ref_fasta" : gs_base_url + "/ref_genome.fa",
       "ref_fasta_index" : gs_base_url + "/ref_genome.fa.fai",
