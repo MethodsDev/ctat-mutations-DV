@@ -169,7 +169,7 @@ ENV PATH=/usr/local/src/ctat-mutations/WDL/:/usr/local/src/ctat-mutations/src/:$
 ## MethodsDev CTAT mutations DV v5.0.0
 WORKDIR $SRC
 ENV CTAT_MUTATIONS_VERSION=5.0.0
-ENV CTAT_MUTATIONS_COMMIT=683f4e8269fb6ecc9234df71b91db9a483495b5b
+ENV CTAT_MUTATIONS_COMMIT=45024a7f2de602843aedf00ff8b4e6bc73cc6edd
 
 # Clone from GitHub using specific commit
 RUN git clone --recursive https://github.com/MethodsDev/ctat-mutations-DV.git ctat-mutations && \
