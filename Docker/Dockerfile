@@ -142,17 +142,7 @@ RUN wget -q https://github.com/lh3/minimap2/releases/download/v${MINIMAP2_VERSIO
 # Models are included in the DeepVariant Docker images
 ENV DEEPVARIANT_VERSION=1.9.0
 
-# Download RNA-seq model (v1.4.0 - most recent RNA model)
-# This is used for Illumina RNA-seq variant calling
-RUN mkdir -p /opt/models/rnaseq && \
-    cd /opt/models/rnaseq && \
-    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.data-00000-of-00001 && \
-    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.example_info.json && \
-    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.index && \
-    wget -q https://storage.googleapis.com/deepvariant/models/DeepVariant/1.4.0/DeepVariant-inception_v3-1.4.0+data-rnaseq_standard/model.ckpt.meta && \
-    cp model.ckpt.example_info.json example_info.json
-
-# Note: PacBio models are included in the DeepVariant Docker image
+# Note: All DeepVariant models (RNASEQ, MASSEQ) are bundled in the google/deepvariant Docker image
 
 
 ## flagCorrection - improves DeepVariant accuracy on long-read RNA-seq
@@ -207,7 +197,7 @@ WORKDIR /usr/local/src/ctat-mutations
 # STAR: 2.7.11b
 # Picard: 3.3.0
 # Minimap2: 2.28
-# DeepVariant: 1.9.0 (with RNA-seq model v1.4.0)
+# DeepVariant: 1.10.0 (via google/deepvariant Docker image; models bundled in DV image)
 # K8: 1.2
 # open-cravat: 2.1.0 (pinned for compatibility)
 # igv-reports: 1.9.0 (pinned for compatibility)
