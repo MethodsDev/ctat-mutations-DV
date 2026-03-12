@@ -1,6 +1,8 @@
 ## CTAT-Mutations v5.0.0 Testing Makefile
 ## Updated for DeepVariant-based variant calling (removed GATK and boosting tests)
 
+one: DV_long_reads
+
 all: DV_standard DV_SE_Reads DV_long_reads DV_SE_Reads_singlecell DV_long_reads_singlecell
 
 
