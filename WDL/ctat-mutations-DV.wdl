@@ -437,7 +437,7 @@ workflow ctat_mutations_DV {
      File realigned_bam = select_first([bam_for_variant_calls, bam])
      File realigned_bai = select_first([bai_for_variant_calls, bai])
 
-     if(annotate_variants && !filter_ready_vcf) {
+     if((annotate_variants || singlecell_mode) && !filter_ready_vcf) {
         call VariantAnnotation.annotate_variants_wf as AnnotateVariants {
                 input:
                     input_vcf = variant_vcf,
@@ -457,7 +457,7 @@ workflow ctat_mutations_DV {
                     rna_editing_vcf_index=rna_editing_vcf_index,
                     bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
                     bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
-                    include_read_var_pos_annotations=include_read_var_pos_annotations,
+                    include_read_var_pos_annotations=annotate_variants && include_read_var_pos_annotations,
                     repeat_mask_bed=repeat_mask_bed,
                     ref_splice_adj_regions_bed=ref_splice_adj_regions_bed,
                     scripts_path=scripts_path,
@@ -466,18 +466,18 @@ workflow ctat_mutations_DV {
                     docker = docker,
                     preemptible = preemptible,
 	                cpu = variant_annotation_cpu,
-                    incl_snpEff = incl_snpEff,
-                    incl_dbsnp = incl_dbsnp,
-                    incl_gnomad = incl_gnomad,
-                    incl_rna_editing = incl_rna_editing,
-                    incl_repeats = incl_repeats,
-                    incl_homopolymers = incl_homopolymers,
-                    incl_splice_dist = incl_splice_dist,
-                    incl_cosmic = incl_cosmic,
-                    incl_cravat = incl_cravat,
+                    incl_snpEff = annotate_variants && incl_snpEff,
+                    incl_dbsnp = annotate_variants && incl_dbsnp,
+                    incl_gnomad = annotate_variants && incl_gnomad,
+                    incl_rna_editing = annotate_variants && incl_rna_editing,
+                    incl_repeats = annotate_variants && incl_repeats,
+                    incl_homopolymers = annotate_variants && incl_homopolymers,
+                    incl_splice_dist = annotate_variants && incl_splice_dist,
+                    incl_cosmic = annotate_variants && incl_cosmic,
+                    incl_cravat = annotate_variants && incl_cravat,
                     singlecell_mode = singlecell_mode
             }
-            
+
       }
       
       if (filter_variants) {
