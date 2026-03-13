@@ -241,7 +241,7 @@ workflow ctat_mutations_DV {
 
     }
 
-    if (normalize_bam ) {
+    if (normalize_bam && !variant_ready_bam) {
 
         call NormalizeBam {
             input:
