@@ -590,7 +590,8 @@ task annotate_PASS_reads {
         echo "######## Annotate PASS Reads #########"
 
         # Note: bam_index is already provided as input, no need to regenerate
-
+        touch ~{bam_index} # ensure datestamp always newer than bam to avoid stderr msgs
+    
         ~{scripts_path}/annotate_PASS_reads.extract_sc_info.py \
             --vcf ~{input_vcf}  \
             --bam ~{bam} \
