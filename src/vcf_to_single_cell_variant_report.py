@@ -4,15 +4,18 @@ import sys
 import re
 import logging
 import argparse
-import subprocess
 import gzip
 import multiprocessing
 import time
 import numpy as np
+import pysam
 
 
 logging.basicConfig(format="\n %(levelname)s : %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+BAM_READER = None
 
 
 def progress_bar(progress_percent):
@@ -24,22 +27,25 @@ def progress_bar(progress_percent):
         sys.stdout.write("[{}{}]{}".format("*" * progress_percent, " " * (100 - progress_percent), str(progress_percent) + "%"))
 
 
-def parse_sc_read_name(readname, bamfields):
-    cb = None
-    umi = None
-    for field in bamfields[11:]:
-        if field.count(":") < 2:
-            continue
-        tag, _, value = field.split(":", 2)
-        if tag == "CB":
-            cb = value
-        elif tag == "XM":
-            umi = value
-
+def parse_sc_read_name(read):
+    cb = read.get_tag("CB") if read.has_tag("CB") else None
+    umi = read.get_tag("XM") if read.has_tag("XM") else None
     if cb or umi:
-        return "{}^{}^{}".format(cb or "NA", umi or "NA", readname)
+        return "{}^{}^{}".format(cb or "NA", umi or "NA", read.query_name)
 
-    return readname
+    return read.query_name
+
+
+def init_worker_bam_reader(bam_file):
+    global BAM_READER
+    BAM_READER = pysam.AlignmentFile(bam_file, "rb")
+
+
+def close_worker_bam_reader():
+    global BAM_READER
+    if BAM_READER is not None:
+        BAM_READER.close()
+        BAM_READER = None
 
 
 def locate_variant_in_read(readstart, cigar, target_position):
@@ -78,7 +84,7 @@ def locate_variant_in_read(readstart, cigar, target_position):
     return base_readpos, adjacent_base_type
 
 
-def summarize_variant(vcf_line, bam_file):
+def summarize_variant(vcf_line):
     vcf_line = vcf_line.decode("utf-8") if isinstance(vcf_line, bytes) else vcf_line
     fields = vcf_line.rstrip().split("\t")
 
@@ -96,34 +102,19 @@ def summarize_variant(vcf_line, bam_file):
     elif len(ref_bases) < len(alt_bases):
         variant_type = "I"
 
-    region = f"{chrom}:{position}-{position}"
-    sam_output = subprocess.check_output(["samtools", "view", bam_file, region], text=True)
-
     reads_with_variant = []
     reads_without_variant = []
 
-    for line in sam_output.splitlines():
-        if not line:
+    for read in BAM_READER.fetch(chrom, position - 1, position):
+        if read.query_sequence is None or read.cigarstring is None:
             continue
 
-        bamfields = line.split("\t")
-        if len(bamfields) < 11:
-            print("-warning: line[{}] has insufficient fields... skipping".format(line), file=sys.stderr)
-            continue
-
-        readname = parse_sc_read_name(bamfields[0], bamfields)
-        readstart = bamfields[3]
-        cigar = bamfields[5]
-        sequencebases = bamfields[9]
-
-        if sequencebases == "*":
-            continue
-
-        base_readpos, adjacent_base_type = locate_variant_in_read(readstart, cigar, position)
+        readname = parse_sc_read_name(read)
+        base_readpos, adjacent_base_type = locate_variant_in_read(read.reference_start + 1, read.cigarstring, position)
         if base_readpos is None:
             continue
 
-        read_suffix = sequencebases[(base_readpos - 1):]
+        read_suffix = read.query_sequence[(base_readpos - 1):]
         if read_suffix.startswith(alt_bases) and variant_type == adjacent_base_type:
             reads_with_variant.append(readname)
         elif read_suffix.startswith(ref_bases):
@@ -132,8 +123,8 @@ def summarize_variant(vcf_line, bam_file):
     return [f"{chrom}:{position}:{ref_bases}:{alt_bases}", reads_with_variant, reads_without_variant]
 
 
-def process_chunk(chunk_index, vcf_lines, bam_file):
-    return (chunk_index, [summarize_variant(line, bam_file) for line in vcf_lines])
+def process_chunk(chunk_index, vcf_lines):
+    return (chunk_index, [summarize_variant(line) for line in vcf_lines])
 
 
 class VariantReportBuilder:
@@ -168,13 +159,15 @@ class VariantReportBuilder:
             results[chunk_index] = chunk_result
 
         if self.threads > 1:
-            pool = multiprocessing.Pool(self.threads)
+            pool = multiprocessing.Pool(self.threads, initializer=init_worker_bam_reader, initargs=(self.bam_file,))
 
             def error_handler(error):
                 logger.error("ERROR_HANDLER - CAUGHT: " + str(error))
                 pool.terminate()
                 pool.join()
                 sys.exit(2)
+        else:
+            init_worker_bam_reader(self.bam_file)
 
         message_str = f"\t\tStart Time: {time.asctime(time.localtime(time.time()))}"
         logger.info(message_str)
@@ -183,12 +176,12 @@ class VariantReportBuilder:
             if self.threads > 1:
                 pool.apply_async(
                     process_chunk,
-                    args=(chunk_index, chunk_lines, self.bam_file),
+                    args=(chunk_index, chunk_lines),
                     callback=logging_return,
                     error_callback=error_handler,
                 )
             else:
-                logging_return(process_chunk(chunk_index, chunk_lines, self.bam_file))
+                logging_return(process_chunk(chunk_index, chunk_lines))
 
         if self.threads > 1:
             pool.close()
@@ -197,6 +190,9 @@ class VariantReportBuilder:
                 progress_bar(progress_percent)
                 time.sleep(2)
             progress_bar(100)
+            pool.join()
+        else:
+            close_worker_bam_reader()
 
         self.results = []
         for chunk_index in range(len(idx_list)):
