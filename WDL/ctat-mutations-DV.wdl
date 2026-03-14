@@ -436,6 +436,8 @@ workflow ctat_mutations_DV {
      File variant_vcf_index = select_first([MergePrimaryAndExtraVCFs.output_vcf_index, dv_vcf_index, vcf_index])
      File realigned_bam = select_first([bam_for_variant_calls, bam])
      File realigned_bai = select_first([bai_for_variant_calls, bai])
+     File pass_read_eval_bam = select_first([SplitReads.ref_bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
+     File pass_read_eval_bai = select_first([SplitReads.ref_bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
 
      if((annotate_variants || singlecell_mode) && !filter_ready_vcf) {
         call VariantAnnotation.annotate_variants_wf as AnnotateVariants {
@@ -455,9 +457,6 @@ workflow ctat_mutations_DV {
                     gnomad_vcf_index=gnomad_vcf_index,
                     rna_editing_vcf=rna_editing_vcf,
                     rna_editing_vcf_index=rna_editing_vcf_index,
-                    bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
-                    bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
-                    include_read_var_pos_annotations=annotate_variants && include_read_var_pos_annotations,
                     repeat_mask_bed=repeat_mask_bed,
                     ref_splice_adj_regions_bed=ref_splice_adj_regions_bed,
                     scripts_path=scripts_path,
@@ -474,18 +473,42 @@ workflow ctat_mutations_DV {
                     incl_homopolymers = annotate_variants && incl_homopolymers,
                     incl_splice_dist = annotate_variants && incl_splice_dist,
                     incl_cosmic = annotate_variants && incl_cosmic,
-                    incl_cravat = annotate_variants && incl_cravat,
-                    singlecell_mode = singlecell_mode
+                    incl_cravat = annotate_variants && incl_cravat
             }
 
+      }
+
+      if((include_read_var_pos_annotations || singlecell_mode) && !filter_ready_vcf) {
+            call VariantAnnotation.examine_existing_annotations as ExistingPassReadAnnots {
+                input:
+                    input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
+                    docker = docker,
+                    preemptible = preemptible
+            }
+
+            if(!defined(ExistingPassReadAnnots.pass_read_annots_done)) {
+                call annotate_PASS_reads {
+                    input:
+                        input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
+                        input_vcf_index = select_first([AnnotateVariants.vcf_index, variant_vcf_index]),
+                        bam = pass_read_eval_bam,
+                        bam_index = pass_read_eval_bai,
+                        singlecell_mode = singlecell_mode,
+                        base_name = sample_id,
+                        scripts_path = scripts_path,
+                        docker = docker,
+                        preemptible = preemptible,
+                        cpu = variant_annotation_cpu
+                }
+            }
       }
       
       if (filter_variants) {
 
             call FilterDeepVariantVCF {
                 input:
-                    input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
-                    input_vcf_index = select_first([AnnotateVariants.vcf_index, variant_vcf_index]),
+                    input_vcf = select_first([annotate_PASS_reads.vcf, AnnotateVariants.vcf, variant_vcf]),
+                    input_vcf_index = select_first([annotate_PASS_reads.vcf_index, AnnotateVariants.vcf_index, variant_vcf_index]),
                     base_name = sample_id,
                     min_gq = deepvariant_min_gq,
                     min_qual = deepvariant_min_qual,
@@ -530,7 +553,7 @@ workflow ctat_mutations_DV {
         Array[File]? deepvariant_gvcf = dv_gvcf_files
         File? variant_calling_bam = realigned_bam
         File? variant_calling_bai = realigned_bai
-        File? annotated_vcf = AnnotateVariants.vcf
+        File? annotated_vcf = select_first([annotate_PASS_reads.vcf, AnnotateVariants.vcf])
         File? filtered_vcf = FilterDeepVariantVCF.filtered_vcf
         File? aligned_bam = StarAlign.bam
         File? aligned_bai = StarAlign.bai
@@ -539,7 +562,61 @@ workflow ctat_mutations_DV {
         File? cancer_igv_report = CancerVariantReport.cancer_igv_report
         File? cancer_variants_tsv = FilterCancerVariants.cancer_variants_tsv
         File? cancer_vcf = FilterCancerVariants.cancer_vcf
-        File? sc_var_reads = AnnotateVariants.sc_var_reads
+        File? sc_var_reads = annotate_PASS_reads.sc_var_reads
+    }
+}
+
+task annotate_PASS_reads {
+    input {
+        File input_vcf
+        File input_vcf_index
+        File bam
+        File bam_index
+        String base_name
+        String scripts_path
+        Boolean singlecell_mode
+
+        String docker
+        Int preemptible
+        Int cpu
+        Int disk = ceil((size(bam, "GB") * 4) + (size(input_vcf, "GB") * 10) + 20)
+    }
+
+    command <<<
+        set -ex
+
+        echo "######## Annotate PASS Reads #########"
+
+        # Note: bam_index is already provided as input, no need to regenerate
+        touch ~{bam_index} # ensure datestamp always newer than bam to avoid stderr msgs
+
+        ~{scripts_path}/annotate_PASS_reads.extract_sc_info.py \
+            --vcf ~{input_vcf}  \
+            --bam ~{bam} \
+            ~{true='--sc_mode' false='' singlecell_mode} \
+            --output_vcf ~{base_name}.annot_pass_reads.vcf \
+            --threads ~{cpu}
+
+        bgzip -c ~{base_name}.annot_pass_reads.vcf > ~{base_name}.annot_pass_reads.vcf.gz
+        tabix ~{base_name}.annot_pass_reads.vcf.gz
+
+        if [ -e ~{base_name}.annot_pass_reads.vcf.sc_reads ]; then
+               gzip ~{base_name}.annot_pass_reads.vcf.sc_reads
+        fi
+    >>>
+
+    output {
+        File vcf = "~{base_name}.annot_pass_reads.vcf.gz"
+        File vcf_index = "~{base_name}.annot_pass_reads.vcf.gz.tbi"
+        File? sc_var_reads = "~{base_name}.annot_pass_reads.vcf.sc_reads.gz"
+    }
+
+    runtime {
+        disks: "local-disk " + disk + " HDD"
+        docker: docker
+        memory: "16G"
+        preemptible: preemptible
+        cpu : cpu
     }
 }
 

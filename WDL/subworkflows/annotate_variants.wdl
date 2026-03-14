@@ -10,23 +10,17 @@ workflow annotate_variants_wf {
         File ref_fasta
         File ref_fasta_index
 
-        File? bam
-        File? bam_index
-
         # annotation options
         Boolean incl_snpEff = true
         Boolean incl_dbsnp = true
         Boolean incl_gnomad = true
         Boolean incl_rna_editing = true
-        Boolean include_read_var_pos_annotations = true
         Boolean incl_repeats = true
         Boolean incl_homopolymers = true
         Boolean incl_splice_dist = true
 
         Boolean incl_cosmic = true
         Boolean incl_cravat = false  # Disabled due to SQLite locking issues with read-only genome lib mount
-
-        Boolean singlecell_mode = false
 
         File? dbsnp_vcf
         File? dbsnp_vcf_index
@@ -93,12 +87,8 @@ workflow annotate_variants_wf {
 
         genome_version:{help:"Genome version for annotating variants using Cravat and SnpEff", choices:["hg19", "hg38"]}
 
-        include_read_var_pos_annotations :{help: "Add vcf annotation that requires variant to be at least 6 bases from ends of reads."}
-
         plugins_path:{help:"Path to plugins"}
         scripts_path:{help:"Path to scripts"}
-
-        singlecell_mode:{help:"run in single-cell mode and capture the cell barcode to variant info"}
 
         docker:{help:"Docker or singularity image"}
     }
@@ -190,30 +180,12 @@ workflow annotate_variants_wf {
         }
     }
 
-    if ( (include_read_var_pos_annotations || singlecell_mode) && ! defined(ExistingAnnots.pass_read_annots_done) ) {
-        
-        call annotate_PASS_reads {
-            input:
-                input_vcf = select_first([annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
-                bam = select_first([bam]),
-                bam_index = select_first([bam_index]),
-                singlecell_mode=singlecell_mode,
-                base_name = base_name,
-                scripts_path = scripts_path,
-                docker = docker,
-                preemptible = preemptible,
-                cpu = cpu
-        }
-    }
-
-
     if (incl_repeats && ! defined (ExistingAnnots.repeats_done) ) {
     
         call annotate_repeats {
             input:
-                input_vcf = select_first([annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+                input_vcf = select_first([annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+                input_vcf_index = select_first([annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
                 repeat_mask_bed = select_first([repeat_mask_bed]),
                 base_name = base_name,
                 scripts_path = scripts_path,
@@ -228,8 +200,8 @@ workflow annotate_variants_wf {
 
         call annotate_homopolymers_n_entropy {
             input:
-                input_vcf = select_first([annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]), 
-                input_vcf_index = select_first([annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+                input_vcf = select_first([annotate_repeats.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]), 
+                input_vcf_index = select_first([annotate_repeats.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
                 ref_fasta = ref_fasta,
                 ref_fasta_index = ref_fasta_index,
                 base_name = base_name,
@@ -242,8 +214,8 @@ workflow annotate_variants_wf {
     if (incl_splice_dist && ! defined (ExistingAnnots.splice_dist_done) ) {
         call annotate_splice_distance {
             input:
-                input_vcf = select_first([annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+                input_vcf = select_first([annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+                input_vcf_index = select_first([annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
                 ref_splice_adj_regions_bed = select_first([ref_splice_adj_regions_bed]),
                 base_name = base_name,
                 scripts_path = scripts_path,
@@ -256,8 +228,8 @@ workflow annotate_variants_wf {
     if (incl_cosmic && ! defined(ExistingAnnots.COSMIC_done) ) {
         call annotate_cosmic_variants {
             input:
-                input_vcf = select_first([annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+                input_vcf = select_first([annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+                input_vcf_index = select_first([annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
                 cosmic_vcf = select_first([cosmic_vcf]),
                 cosmic_vcf_index = select_first([cosmic_vcf_index]),
                 base_name = base_name,
@@ -272,8 +244,8 @@ workflow annotate_variants_wf {
          
         call open_cravat {
             input:
-                input_vcf = select_first([annotate_cosmic_variants.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-                input_vcf_index = select_first([annotate_cosmic_variants.vcf_index, annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+                input_vcf = select_first([annotate_cosmic_variants.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+                input_vcf_index = select_first([annotate_cosmic_variants.vcf_index, annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
                 cravat_lib_tar_gz = cravat_lib_tar_gz,
                 cravat_lib_dir = cravat_lib_dir,
                 genome_version = select_first([genome_version]),
@@ -287,8 +259,8 @@ workflow annotate_variants_wf {
 
     call rename_vcf {
         input:
-            input_vcf = select_first([open_cravat.vcf, annotate_cosmic_variants.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_PASS_reads.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
-            input_vcf_index = select_first([open_cravat.vcf_index, annotate_cosmic_variants.vcf_index, annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_PASS_reads.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
+            input_vcf = select_first([open_cravat.vcf, annotate_cosmic_variants.vcf, annotate_splice_distance.vcf, annotate_homopolymers_n_entropy.vcf, annotate_repeats.vcf, annotate_RNA_editing.vcf, annotate_gnomad.vcf, annotate_dbsnp.vcf, snpEff.vcf, left_norm_vcf.vcf, input_vcf]),
+            input_vcf_index = select_first([open_cravat.vcf_index, annotate_cosmic_variants.vcf_index, annotate_splice_distance.vcf_index, annotate_homopolymers_n_entropy.vcf_index, annotate_repeats.vcf_index, annotate_RNA_editing.vcf_index, annotate_gnomad.vcf_index, annotate_dbsnp.vcf_index, snpEff.vcf_index, left_norm_vcf.vcf_index, input_vcf_index]),
             base_name = base_name,
             docker=docker,
             preemptible=preemptible
@@ -300,7 +272,6 @@ workflow annotate_variants_wf {
     
         File vcf = rename_vcf.vcf
         File vcf_index = rename_vcf.vcf_index
-        File? sc_var_reads = annotate_PASS_reads.sc_var_reads
     
     }
 }
@@ -551,68 +522,6 @@ task annotate_RNA_editing {
     output {
         File vcf = "~{base_name}.rna_editing.groom.vcf.gz"
         File vcf_index = "~{base_name}.rna_editing.groom.vcf.gz.tbi"
-    }
-
-    runtime {
-        disks: "local-disk " + disk + " HDD"
-        docker: docker
-        memory: "16G"
-        preemptible: preemptible
-        cpu : cpu
-    }
-
-}
-
-
-task annotate_PASS_reads {
-
-    input {
-        File input_vcf
-        File input_vcf_index
-        File bam
-        File bam_index
-        String base_name
-        String scripts_path
-        Boolean singlecell_mode
-
-        String docker
-        Int preemptible
-        Int cpu
-        Int disk = ceil((size(bam, "GB") * 4) + (size(input_vcf, "GB") * 10) + 20)
-        
-    }
-
-
-    command <<<
-
-        set -ex
-
-        echo "######## Annotate PASS Reads #########"
-
-        # Note: bam_index is already provided as input, no need to regenerate
-        touch ~{bam_index} # ensure datestamp always newer than bam to avoid stderr msgs
-    
-        ~{scripts_path}/annotate_PASS_reads.extract_sc_info.py \
-            --vcf ~{input_vcf}  \
-            --bam ~{bam} \
-            ~{true='--sc_mode' false='' singlecell_mode} \
-            --output_vcf ~{base_name}.annot_pass_reads.vcf \
-            --threads ~{cpu}
-
-            bgzip -c ~{base_name}.annot_pass_reads.vcf > ~{base_name}.annot_pass_reads.vcf.gz
-            tabix ~{base_name}.annot_pass_reads.vcf.gz
-
-        if [ -e ~{base_name}.annot_pass_reads.vcf.sc_reads ]; then
-               gzip ~{base_name}.annot_pass_reads.vcf.sc_reads
-        fi
-
-    >>>
-
-
-    output {
-        File vcf = "~{base_name}.annot_pass_reads.vcf.gz"
-        File vcf_index = "~{base_name}.annot_pass_reads.vcf.gz.tbi"
-        File? sc_var_reads = "~{base_name}.annot_pass_reads.vcf.sc_reads.gz"
     }
 
     runtime {
