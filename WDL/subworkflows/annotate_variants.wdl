@@ -613,7 +613,7 @@ task annotate_homopolymers_n_entropy {
          ~{scripts_path}/annotate_entropy_n_homopolymers.py \
             --input_vcf ~{input_vcf} \
             --ref_genome_fa ~{ref_fasta} \
-            --tmpdir $TMPDIR \
+            --tmpdir "$TMPDIR" \
             --output_vcf ~{base_name}.homopolymer.vcf
 
             bgzip -c ~{base_name}.homopolymer.vcf > ~{base_name}.homopolymer.vcf.gz
@@ -667,7 +667,7 @@ task annotate_splice_distance {
         ~{scripts_path}/annotate_DJ.py \
             --input_vcf ~{input_vcf} \
             --splice_bed ~{ref_splice_adj_regions_bed} \
-            --temp_dir $TMPDIR \
+            --temp_dir "$TMPDIR" \
             --output_vcf ~{base_name}.splice_distance.vcf
 
         bgzip -c ~{base_name}.splice_distance.vcf > ~{base_name}.splice_distance.vcf.gz
@@ -963,7 +963,7 @@ task examine_existing_annotations {
         set +e
         
         echo "checking done annotations:"
-        ls *.done
+        ls ./*.done
 
         echo "done checking"
         

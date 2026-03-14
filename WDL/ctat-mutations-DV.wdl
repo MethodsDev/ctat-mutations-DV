@@ -107,7 +107,6 @@ workflow ctat_mutations_DV {
 
         Int preemptible = 2
         String docker = "trinityctat/ctat_mutations_dv:latest"
-        Int variant_scatter_count = 6
         String plugins_path = "/usr/local/src/ctat-mutations/plugins"
         String scripts_path = "/usr/local/src/ctat-mutations/src"
 
@@ -180,7 +179,6 @@ workflow ctat_mutations_DV {
         star_memory:{help:"STAR aligner memory"}
         output_unmapped_reads:{help:"Whether to output unmapped reads from STAR"}
 
-        variant_scatter_count:{help:"Number of parallel variant caller jobs"}
         variant_filtration_cpu:{help:"Number of CPUs for variant filtration task"}
         variant_annotation_cpu:{help:"Number of CPUs for variant annotation task"}
 
@@ -285,7 +283,6 @@ workflow ctat_mutations_DV {
         }
     }
     
-    File fasta = select_first([MergeFastas.fasta, ref_fasta])
     File fasta_index = select_first([MergeFastas.fasta_index, ref_fasta_index])
 
 
@@ -299,6 +296,7 @@ workflow ctat_mutations_DV {
                 input_bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, mm2.bam, bam]),
                 input_bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, mm2.bai, bai]),
                 scripts_path = scripts_path,
+                memory = split_n_cigar_reads_memory,
                 docker = docker,
                 preemptible = preemptible
             }
@@ -323,25 +321,25 @@ workflow ctat_mutations_DV {
         }
 
         call SplitReads {
-            input:
-                input_bam = select_first([SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam]),
-                input_bam_index = select_first([SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai]),
-                extra_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
-                ref_name = basename(basename(ref_fasta, ".fa"), ".fasta"),
-                extra_fasta_index = CreateFastaIndex.fasta_index,
-                ref_fasta_index = ref_fasta_index,
+                input:
+                    input_bam = select_first([SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam]),
+                    input_bam_index = select_first([SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai]),
+                    extra_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
+                    ref_name = basename(basename(ref_fasta, ".fa"), ".fasta"),
+                    extra_fasta_index = CreateFastaIndex.fasta_index,
+                    ref_fasta_index = ref_fasta_index,
                 docker = docker,
                 preemptible = preemptible
         }
-        if(select_first([SplitReads.extra_bam_number_of_reads, 0]) > 0) {
+        if(SplitReads.extra_bam_number_of_reads > 0) {
             # DeepVariant for extra_fasta reads
             if (!deepvariant_use_gpu) {
                 call DeepVariant_cpu as DeepVariant_Extra_cpu {
                     input:
-                        input_bam = select_first([SplitReads.extra_bam]),
-                        input_bam_index = select_first([SplitReads.extra_bai]),
-                        ref_fasta = select_first([CreateFastaIndex.fasta]),
-                        ref_fasta_index = select_first([CreateFastaIndex.fasta_index]),
+                        input_bam = SplitReads.extra_bam,
+                        input_bam_index = SplitReads.extra_bai,
+                        ref_fasta = CreateFastaIndex.fasta,
+                        ref_fasta_index = CreateFastaIndex.fasta_index,
                         sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
                         is_long_reads = is_long_reads,
                         output_gvcf = output_gvcf,
@@ -354,10 +352,10 @@ workflow ctat_mutations_DV {
             if (deepvariant_use_gpu) {
                 call DeepVariant_gpu as DeepVariant_Extra_gpu {
                     input:
-                        input_bam = select_first([SplitReads.extra_bam]),
-                        input_bam_index = select_first([SplitReads.extra_bai]),
-                        ref_fasta = select_first([CreateFastaIndex.fasta]),
-                        ref_fasta_index = select_first([CreateFastaIndex.fasta_index]),
+                        input_bam = SplitReads.extra_bam,
+                        input_bam_index = SplitReads.extra_bai,
+                        ref_fasta = CreateFastaIndex.fasta,
+                        ref_fasta_index = CreateFastaIndex.fasta_index,
                         sample_name = sample_id + '_' + basename(basename(select_first([extra_fasta]), ".fa"), ".fasta"),
                         is_long_reads = is_long_reads,
                         output_gvcf = output_gvcf,
@@ -434,6 +432,7 @@ workflow ctat_mutations_DV {
      File realigned_bam = select_first([bam_for_variant_calls, bam])
      File realigned_bai = select_first([bai_for_variant_calls, bai])
      File pass_read_eval_bam = select_first([SplitReads.ref_bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
+     File pass_read_eval_bai = select_first([SplitReads.ref_bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
 
      if((annotate_variants || singlecell_mode) && !filter_ready_vcf) {
         call VariantAnnotation.annotate_variants_wf as AnnotateVariants {
@@ -474,28 +473,6 @@ workflow ctat_mutations_DV {
 
       }
 
-      if(singlecell_mode && !filter_ready_vcf) {
-            call VariantAnnotation.examine_existing_annotations as ExistingPassReadAnnots {
-                input:
-                    input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
-                    docker = docker,
-                    preemptible = preemptible
-            }
-
-            if(!defined(ExistingPassReadAnnots.pass_read_annots_done)) {
-                call annotate_PASS_reads {
-                    input:
-                        input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
-                        bam = pass_read_eval_bam,
-                        base_name = sample_id,
-                        scripts_path = scripts_path,
-                        docker = docker,
-                        preemptible = preemptible,
-                        cpu = variant_annotation_cpu
-                }
-            }
-      }
-      
       if (filter_variants) {
 
             call FilterDeepVariantVCF {
@@ -506,6 +483,8 @@ workflow ctat_mutations_DV {
                     min_gq = deepvariant_min_gq,
                     min_qual = deepvariant_min_qual,
                     min_dp = deepvariant_min_dp,
+                    cpu = variant_filtration_cpu,
+                    memory = filter_memory,
                     docker = docker,
                     preemptible = preemptible
             }
@@ -537,15 +516,29 @@ workflow ctat_mutations_DV {
                     }
                 }
             }
-    }
+      }
+
+      if(singlecell_mode && !filter_ready_vcf) {
+            call single_cell_report {
+                input:
+                    input_vcf = select_first([FilterDeepVariantVCF.filtered_vcf, AnnotateVariants.vcf, variant_vcf]),
+                    bam = pass_read_eval_bam,
+                    bam_index = pass_read_eval_bai,
+                    base_name = sample_id,
+                    scripts_path = scripts_path,
+                    docker = docker,
+                    preemptible = preemptible,
+                    cpu = variant_annotation_cpu
+            }
+      }
     
 
     output {
-        File? deepvariant_vcf = variant_vcf
-        File? deepvariant_vcf_index = variant_vcf_index
+        File deepvariant_vcf = variant_vcf
+        File deepvariant_vcf_index = variant_vcf_index
         Array[File]? deepvariant_gvcf = dv_gvcf_files
-        File? variant_calling_bam = realigned_bam
-        File? variant_calling_bai = realigned_bai
+        File variant_calling_bam = realigned_bam
+        File variant_calling_bai = realigned_bai
         File? annotated_vcf = AnnotateVariants.vcf
         File? filtered_vcf = FilterDeepVariantVCF.filtered_vcf
         File? aligned_bam = StarAlign.bam
@@ -555,21 +548,22 @@ workflow ctat_mutations_DV {
         File? cancer_igv_report = CancerVariantReport.cancer_igv_report
         File? cancer_variants_tsv = FilterCancerVariants.cancer_variants_tsv
         File? cancer_vcf = FilterCancerVariants.cancer_vcf
-        File? sc_var_reads = annotate_PASS_reads.sc_var_reads
+        File? single_cell_report_tsv_gz = single_cell_report.report_tsv_gz
     }
 }
 
-task annotate_PASS_reads {
+task single_cell_report {
     input {
         File input_vcf
         File bam
+        File bam_index
         String base_name
         String scripts_path
 
         String docker
         Int preemptible
         Int cpu
-        Int disk = ceil((size(bam, "GB") * 4) + (size(input_vcf, "GB") * 10) + 20)
+        Int disk = ceil((size(bam, "GB") * 4) + (size(bam_index, "GB") * 2) + (size(input_vcf, "GB") * 10) + 20)
     }
 
     command <<<
@@ -577,9 +571,12 @@ task annotate_PASS_reads {
 
         echo "######## Single Cell Variant Report #########"
 
+        ln -sf ~{bam} input.bam
+        ln -sf ~{bam_index} input.bam.bai
+
         ~{scripts_path}/vcf_to_single_cell_variant_report.py \
             --vcf ~{input_vcf}  \
-            --bam ~{bam} \
+            --bam input.bam \
             --output ~{base_name}.single_cell_variant_report.tsv \
             --threads ~{cpu}
 
@@ -587,7 +584,7 @@ task annotate_PASS_reads {
     >>>
 
     output {
-        File sc_var_reads = "~{base_name}.single_cell_variant_report.tsv.gz"
+        File report_tsv_gz = "~{base_name}.single_cell_variant_report.tsv.gz"
     }
 
     runtime {
@@ -792,8 +789,6 @@ task StarAlign {
         Boolean output_unmapped_reads
         String STAR_limitBAMsortRAM
     }
-    Boolean is_gzip = sub(select_first([fastq1]), "^.+\\.(gz)$", "GZ") == "GZ"
-
     command <<<
         set -ex
 
@@ -814,27 +809,33 @@ task StarAlign {
             genomeDir="genome_dir"
         fi
 
-        fastqs="~{fastq1} ~{fastq2}"
-        readFilesCommand=""
+        fastq1="~{fastq1}"
+        fastq2="~{fastq2}"
+        read_files=("$fastq1")
+        if [ -n "$fastq2" ]; then
+            read_files+=("$fastq2")
+        fi
+        readFilesCommand=()
         if [[ "~{fastq1}" == *.gz ]] ; then
-            readFilesCommand="--readFilesCommand \"gunzip -c\""
+            readFilesCommand=(--readFilesCommand "gunzip -c")
         fi
 
         # special case for tar of fastq files
         if [[ "~{fastq1}" == *.tar.gz ]] ; then
             mkdir fastq
             tar -I pigz -xvf ~{fastq1} -C fastq
-            fastqs=$(find fastq -type f)
-            readFilesCommand=""
-            if [[ "$fastqs" = *.gz ]] ; then
-                readFilesCommand="--readFilesCommand \"gunzip -c\""
+            mapfile -t read_files < <(find fastq -type f | sort)
+            readFilesCommand=()
+            if [ "${#read_files[@]}" -gt 0 ] && [[ "${read_files[0]}" == *.gz ]] ; then
+                readFilesCommand=(--readFilesCommand "gunzip -c")
             fi
         fi
 
         STAR \
-        --genomeDir $genomeDir \
+        --genomeDir "$genomeDir" \
         --runThreadN ~{cpu} \
-        --readFilesIn $fastqs $readFilesCommand \
+        --readFilesIn "${read_files[@]}" \
+        "${readFilesCommand[@]}" \
         --outSAMtype BAM SortedByCoordinate \
         --twopassMode Basic \
         --limitBAMsortRAM ~{STAR_limitBAMsortRAM} \
@@ -876,7 +877,7 @@ task Minimap2_align {
     input {
         String sample_id
         File? mm2_genome_idx
-        String? mm2_splice_bed
+        File? mm2_splice_bed
         File? reads
 
         Int cpu
@@ -892,7 +893,7 @@ task Minimap2_align {
     command <<<
         set -ex
 
-        minimap2 --junc-bed ~{mm2_splice_bed} -ax splice:hq -u b -t ~{cpu} ~{mm2_genome_idx} ~{reads} > mm2.sam
+        minimap2 ~{if defined(mm2_splice_bed) then "--junc-bed " + mm2_splice_bed else ""} -ax splice:hq -u b -t ~{cpu} ~{mm2_genome_idx} ~{reads} > mm2.sam
 
         samtools view -Sb -o mm2.unsorted.bam mm2.sam
         
@@ -1069,6 +1070,8 @@ task FilterDeepVariantVCF {
         Int min_gq = 18  # DeepVariant recommended threshold for high precision
         Int min_qual = 20
         Int min_dp = 5
+        Int cpu = 1
+        Float memory = 4
         String docker
         Int preemptible
     }
@@ -1095,8 +1098,8 @@ task FilterDeepVariantVCF {
 
     runtime {
         docker: docker
-        memory: "4 GB"
-        cpu: 1
+        memory: memory + " GB"
+        cpu: cpu
         disks: "local-disk " + ceil(size(input_vcf, "GB") * 2 + 20) + " HDD"
         preemptible: preemptible
     }
@@ -1153,7 +1156,6 @@ task MergeVCFs {
 task MergeRealignedBams {
     input {
         Array[File] input_bams
-        Array[File] input_bais
         String output_bam_name
         String output_bai_name
         Int disk_size = 100
@@ -1219,7 +1221,6 @@ task CreateFastaIndex {
         Int preemptible
     }
     String fasta_basename = basename(select_first([input_fasta]))
-    String prefix_no_ext = basename(basename(select_first([input_fasta]), ".fa"), ".fasta")
     command <<<
 
         cp ~{input_fasta} ~{fasta_basename}
@@ -1285,8 +1286,11 @@ task SplitReads {
         to_txt(extra_chr, 'extra.txt')
         CODE
 
-        samtools view -b ~{input_bam} $(cat extra.txt) > ~{extra_name}.bam
-        samtools view -b ~{input_bam} $(cat ref.txt) > ~{ref_name}.bam
+        read -r -a extra_regions < extra.txt
+        read -r -a ref_regions < ref.txt
+
+        samtools view -b ~{input_bam} "${extra_regions[@]}" > ~{extra_name}.bam
+        samtools view -b ~{input_bam} "${ref_regions[@]}" > ~{ref_name}.bam
 
         samtools index ~{extra_name}.bam
         samtools index ~{ref_name}.bam
@@ -1350,6 +1354,7 @@ task SplitNCigarLongReads {
         File input_bam
         File input_bam_index
         String scripts_path
+        Float memory = 8
         
         String docker
         Int preemptible
@@ -1379,7 +1384,7 @@ task SplitNCigarLongReads {
     runtime {
         disks: "local-disk " + ceil((size(input_bam, "GB") + 10) * 10 ) + " SSD"
         docker: docker
-        memory: "8GB"
+        memory: memory + "GB"
         preemptible: preemptible
     }
 }
