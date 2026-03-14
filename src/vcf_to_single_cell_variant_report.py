@@ -7,7 +7,6 @@ import argparse
 import gzip
 import multiprocessing
 import time
-import numpy as np
 import pysam
 
 
@@ -25,6 +24,16 @@ def progress_bar(progress_percent):
         sys.stdout.write("[{}{}]{}\n".format("*" * progress_percent, " " * (100 - progress_percent), str(progress_percent) + "%"))
     else:
         sys.stdout.write("[{}{}]{}".format("*" * progress_percent, " " * (100 - progress_percent), str(progress_percent) + "%"))
+
+
+def chunk_lines(lines, num_chunks):
+    if not lines:
+        return []
+
+    num_chunks = max(1, min(num_chunks, len(lines)))
+    chunk_size = (len(lines) + num_chunks - 1) // num_chunks
+
+    return [lines[i:i + chunk_size] for i in range(0, len(lines), chunk_size)]
 
 
 def parse_sc_read_name(read):
@@ -149,8 +158,7 @@ class VariantReportBuilder:
 
     def build(self):
         logger.info("\tBuilding single-cell variant report")
-        idx_list = np.array_split(self.variant_lines, self.chunks)
-        idx_list = [list(i) for i in idx_list if len(i) != 0]
+        idx_list = chunk_lines(self.variant_lines, self.chunks)
 
         results = {}
 
@@ -172,16 +180,16 @@ class VariantReportBuilder:
         message_str = f"\t\tStart Time: {time.asctime(time.localtime(time.time()))}"
         logger.info(message_str)
 
-        for chunk_index, chunk_lines in enumerate(idx_list):
+        for chunk_index, chunk_variant_lines in enumerate(idx_list):
             if self.threads > 1:
                 pool.apply_async(
                     process_chunk,
-                    args=(chunk_index, chunk_lines),
+                    args=(chunk_index, chunk_variant_lines),
                     callback=logging_return,
                     error_callback=error_handler,
                 )
             else:
-                logging_return(process_chunk(chunk_index, chunk_lines))
+                logging_return(process_chunk(chunk_index, chunk_variant_lines))
 
         if self.threads > 1:
             pool.close()
