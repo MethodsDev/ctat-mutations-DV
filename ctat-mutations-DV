@@ -139,12 +139,6 @@ def main():
     )
 	
     parser.add_argument(
-        "--no_include_read_var_pos_annotations",
-        action="store_true",
-        help="Do not include variant position in read annotations (debugging/troubleshooting purposes only) Removes: VPR,VAF,VMMF,PctExtPos",
-    )
-
-    parser.add_argument(
         "--cpu", type=int, help="Number of CPUs for multi-threaded steps (e.g. STAR, variant position annotation)",
     )
 
@@ -238,7 +232,6 @@ def main():
     variant_ready_bam = args.variant_ready_bam
     filter_ready_vcf = args.filter_ready_vcf
     variant_scatter_count = args.variant_scatter_count
-    no_include_read_var_pos_annotations = args.no_include_read_var_pos_annotations
     no_cravat = args.no_cravat
     no_filter_cancer_variants = args.no_filter_cancer_variants
     sample_id = args.sample_id
@@ -417,9 +410,6 @@ def main():
     # Using DeepVariant v1.10.0 (native RNA-seq model)
     input_json["deepvariant_docker"] = "google/deepvariant:1.10.0"
     input_json["variant_scatter_count"] = variant_scatter_count
-
-    # Disable time-consuming annotations that aren't essential
-    input_json["include_read_var_pos_annotations"] = not no_include_read_var_pos_annotations
 
     if args.star_limitBAMsortRAM:
         input_json["star_limitBAMsortRAM"] = args.star_limitBAMsortRAM

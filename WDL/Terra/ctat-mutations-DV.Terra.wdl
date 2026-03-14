@@ -67,7 +67,6 @@ workflow ctat_mutations_Terra {
     Boolean incl_homopolymers = true
     Boolean incl_splice_dist = true
     Boolean incl_cosmic = true
-    Boolean include_read_var_pos_annotations = false
     Boolean incl_cravat = false
   }
   
@@ -119,7 +118,6 @@ workflow ctat_mutations_Terra {
       incl_homopolymers = incl_homopolymers,
       incl_splice_dist = incl_splice_dist,
       incl_cosmic = incl_cosmic,
-      include_read_var_pos_annotations = include_read_var_pos_annotations,
       incl_cravat = incl_cravat
    }
 
@@ -154,5 +152,4 @@ workflow ctat_mutations_Terra {
 
     }
 }
-
 
