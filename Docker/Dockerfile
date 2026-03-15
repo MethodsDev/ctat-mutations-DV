@@ -168,8 +168,8 @@ ENV PATH=/usr/local/src/ctat-mutations/WDL/:/usr/local/src/ctat-mutations/src/:$
 
 ## MethodsDev CTAT mutations DV v5.0.0
 WORKDIR $SRC
-ENV CTAT_MUTATIONS_VERSION=5.0.0
-ENV CTAT_MUTATIONS_COMMIT=45024a7f2de602843aedf00ff8b4e6bc73cc6edd
+ENV CTAT_MUTATIONS_VERSION=5.0.1
+ENV CTAT_MUTATIONS_COMMIT=e3d76a37eaf9e644bc732930511964cfb3232f7d
 
 # Clone from GitHub using specific commit
 RUN git clone --recursive https://github.com/MethodsDev/ctat-mutations-DV.git ctat-mutations && \
@@ -200,4 +200,4 @@ WORKDIR /usr/local/src/ctat-mutations
 # K8: 1.2
 # open-cravat: 2.1.0 (pinned for compatibility)
 # igv-reports: 1.9.0 (pinned for compatibility)
-# CTAT-Mutations: 5.0.0
+
