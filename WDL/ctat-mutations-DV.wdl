@@ -1410,14 +1410,35 @@ task SplitNCigarLongReads {
     String output_bam_filename = basename(input_bam, ".bam") + ".splitNcigar.bam"
     
     command <<<
-        set -ex
+        set -euo pipefail
         # monitor_script.sh &
+
+        cmd="~{scripts_path}/cigar_N_splitter.py ~{input_bam} split_N.bam; samtools sort split_N.bam -o ~{output_bam_filename}"
+        comment="Split reads on N CIGAR operations and sorted into ~{output_bam_filename}"
+        pg_id="SplitNCigarLongReads_~{basename(output_bam_filename, ".bam")}"
 
         ~{scripts_path}/cigar_N_splitter.py ~{input_bam}  split_N.bam
 
         samtools sort split_N.bam -o ~{output_bam_filename}
 
-        samtools index  ~{output_bam_filename}
+        samtools view -H ~{output_bam_filename} > header.sam
+
+        last_pg_id=$(awk -F'\t' '$1=="@PG" { for (i=2; i<=NF; i++) if ($i ~ /^ID:/) id=substr($i,4) } END { print id }' header.sam)
+
+        {
+            cat header.sam
+            if [ -n "${last_pg_id:-}" ]; then
+                printf '@PG\tID:%s\tPN:cigar_N_splitter.py\tPP:%s\tCL:%s\n' "$pg_id" "$last_pg_id" "$cmd"
+            else
+                printf '@PG\tID:%s\tPN:cigar_N_splitter.py\tCL:%s\n' "$pg_id" "$cmd"
+            fi
+            printf '@CO\t%s\n' "$comment"
+        } > header.with_provenance.sam
+
+        samtools reheader header.with_provenance.sam ~{output_bam_filename} > tmp.reheadered.bam
+        mv tmp.reheadered.bam ~{output_bam_filename}
+
+        samtools index ~{output_bam_filename}
         
     >>>
 
@@ -1452,11 +1473,32 @@ task NormalizeBam {
     
     command <<<
 
-        set -ex
+        set -euo pipefail
+
+        cmd="~{scripts_path}/normalize_bam_by_strand.py --input_bam ~{input_bam} --normalize_max_cov_level ~{max_coverage} --output_bam ~{output_bam_filename}"
+        comment="Normalized BAM by strand with max coverage ~{max_coverage} into ~{output_bam_filename}"
+        pg_id="NormalizeBam_~{basename(output_bam_filename, ".bam")}"
 
         ~{scripts_path}/normalize_bam_by_strand.py --input_bam ~{input_bam} \
             --normalize_max_cov_level ~{max_coverage} \
             --output_bam ~{output_bam_filename}
+
+        samtools view -H ~{output_bam_filename} > header.sam
+
+        last_pg_id=$(awk -F'\t' '$1=="@PG" { for (i=2; i<=NF; i++) if ($i ~ /^ID:/) id=substr($i,4) } END { print id }' header.sam)
+
+        {
+            cat header.sam
+            if [ -n "${last_pg_id:-}" ]; then
+                printf '@PG\tID:%s\tPN:normalize_bam_by_strand.py\tPP:%s\tCL:%s\n' "$pg_id" "$last_pg_id" "$cmd"
+            else
+                printf '@PG\tID:%s\tPN:normalize_bam_by_strand.py\tCL:%s\n' "$pg_id" "$cmd"
+            fi
+            printf '@CO\t%s\n' "$comment"
+        } > header.with_provenance.sam
+
+        samtools reheader header.with_provenance.sam ~{output_bam_filename} > tmp.reheadered.bam
+        mv tmp.reheadered.bam ~{output_bam_filename}
 
         samtools index ~{output_bam_filename}
 
