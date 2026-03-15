@@ -74,6 +74,7 @@ workflow ctat_mutations_DV {
         Boolean singlecell_mode = false
 
         Boolean normalize_bam = true
+        Int normalize_max_cov_level = 1000
 
         # DeepVariant configuration
         # Using v1.10.0 with run_deepvariant wrapper (handles make_examples/call_variants/postprocess_variants internally)
@@ -181,6 +182,7 @@ workflow ctat_mutations_DV {
 
         variant_filtration_cpu:{help:"Number of CPUs for variant filtration task"}
         variant_annotation_cpu:{help:"Number of CPUs for variant annotation task"}
+        normalize_max_cov_level:{help:"Maximum per-strand coverage level used during BAM normalization"}
 
         plugins_path:{help:"Path to plugins"}
         scripts_path:{help:"Path to scripts"}
@@ -241,6 +243,7 @@ workflow ctat_mutations_DV {
         call NormalizeBam {
             input:
             input_bam = select_first([StarAlign.bam, mm2.bam, bam]),
+            max_coverage = normalize_max_cov_level,
             scripts_path = scripts_path,
             docker = docker,
             preemptible = preemptible
@@ -434,6 +437,17 @@ workflow ctat_mutations_DV {
      File pass_read_eval_bam = select_first([SplitReads.ref_bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
      File pass_read_eval_bai = select_first([SplitReads.ref_bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
 
+     if(!vcf_input || defined(bam)) {
+        call StageVariantReadyBam {
+            input:
+                input_bam = realigned_bam,
+                input_bai = realigned_bai,
+                sample_id = sample_id,
+                docker = docker,
+                preemptible = preemptible
+        }
+     }
+
      if((annotate_variants || singlecell_mode) && !filter_ready_vcf) {
         call VariantAnnotation.annotate_variants_wf as AnnotateVariants {
                 input:
@@ -537,6 +551,8 @@ workflow ctat_mutations_DV {
         File deepvariant_vcf = variant_vcf
         File deepvariant_vcf_index = variant_vcf_index
         Array[File]? deepvariant_gvcf = dv_gvcf_files
+        File variant_ready_bam_file = select_first([StageVariantReadyBam.variant_ready_bam, realigned_bam])
+        File variant_ready_bai_file = select_first([StageVariantReadyBam.variant_ready_bai, realigned_bai])
         File variant_calling_bam = realigned_bam
         File variant_calling_bai = realigned_bai
         File? annotated_vcf = AnnotateVariants.vcf
@@ -593,6 +609,36 @@ task single_cell_report {
         memory: "16G"
         preemptible: preemptible
         cpu : cpu
+    }
+}
+
+task StageVariantReadyBam {
+    input {
+        File input_bam
+        File input_bai
+        String sample_id
+        String docker
+        Int preemptible
+    }
+
+    command <<<
+        set -e
+
+        ln -f ~{input_bam} "~{sample_id}.variant-ready.bam"
+        ln -f ~{input_bai} "~{sample_id}.variant-ready.bam.bai"
+    >>>
+
+    output {
+        File variant_ready_bam = "~{sample_id}.variant-ready.bam"
+        File variant_ready_bai = "~{sample_id}.variant-ready.bam.bai"
+    }
+
+    runtime {
+        disks: "local-disk " + ceil(size(input_bam, "GB") * 2 + 10) + " HDD"
+        docker: docker
+        memory: "1G"
+        preemptible: preemptible
+        cpu: 1
     }
 }
 

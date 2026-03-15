@@ -55,6 +55,7 @@ workflow ctat_mutations_Terra {
     Boolean is_long_reads = false
     Boolean annotate_variants = true
     Boolean singlecell_mode = false
+    Int normalize_max_cov_level = 1000
     Int? preemptible
     Ctat_mutations_config pipe_inputs_config
 
@@ -86,6 +87,7 @@ workflow ctat_mutations_Terra {
       intervals = intervals,
       annotate_variants = annotate_variants,
       singlecell_mode = singlecell_mode,
+      normalize_max_cov_level = normalize_max_cov_level,
 
       is_long_reads = is_long_reads,
 
@@ -124,13 +126,17 @@ workflow ctat_mutations_Terra {
 
     output {
         # DeepVariant outputs (v5.0.0+)
-        File? deepvariant_vcf = CM_wf.deepvariant_vcf
-        File? deepvariant_vcf_index = CM_wf.deepvariant_vcf_index
+        File deepvariant_vcf = CM_wf.deepvariant_vcf
+        File deepvariant_vcf_index = CM_wf.deepvariant_vcf_index
         Array[File]? deepvariant_gvcf = CM_wf.deepvariant_gvcf
 
+        # Variant-ready BAM used for calling
+        File variant_ready_bam_file = CM_wf.variant_ready_bam_file
+        File variant_ready_bai_file = CM_wf.variant_ready_bai_file
+
         # Variant calling BAM (replaces haplotype_caller_realigned_bam)
-        File? variant_calling_bam = CM_wf.variant_calling_bam
-        File? variant_calling_bai = CM_wf.variant_calling_bai
+        File variant_calling_bam = CM_wf.variant_calling_bam
+        File variant_calling_bai = CM_wf.variant_calling_bai
 
         # Annotated and filtered VCFs
         File? annotated_vcf = CM_wf.annotated_vcf
@@ -147,9 +153,8 @@ workflow ctat_mutations_Terra {
         File? cancer_variants_tsv = CM_wf.cancer_variants_tsv
         File? cancer_vcf = CM_wf.cancer_vcf
 
-        # Single-cell variant reads (if applicable)
-        File? sc_var_reads = CM_wf.sc_var_reads
+        # Single-cell variant report (if applicable)
+        File? single_cell_report_tsv_gz = CM_wf.single_cell_report_tsv_gz
 
     }
 }
-
