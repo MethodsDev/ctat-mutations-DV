@@ -624,8 +624,8 @@ task StageVariantReadyBam {
     command <<<
         set -e
 
-        ln -f ~{input_bam} "~{sample_id}.variant-ready.bam"
-        ln -f ~{input_bai} "~{sample_id}.variant-ready.bam.bai"
+        cp ~{input_bam} "~{sample_id}.variant-ready.bam"
+        cp ~{input_bai} "~{sample_id}.variant-ready.bam.bai"
     >>>
 
     output {
@@ -634,7 +634,7 @@ task StageVariantReadyBam {
     }
 
     runtime {
-        disks: "local-disk " + ceil(size(input_bam, "GB") * 2 + 10) + " HDD"
+        disks: "local-disk " + ceil(size(input_bam, "GB") * 3 + size(input_bai, "GB") * 2 + 10) + " HDD"
         docker: docker
         memory: "1G"
         preemptible: preemptible
