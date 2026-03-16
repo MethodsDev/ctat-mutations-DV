@@ -509,8 +509,6 @@ workflow ctat_mutations_DV {
                     input:
                         input_vcf = FilterDeepVariantVCF.filtered_vcf,
                         base_name = sample_id,
-                        ref_fasta = ref_fasta,
-                        ref_fasta_index = ref_fasta_index,
                         scripts_path=scripts_path,
                         docker = docker,
                         preemptible = preemptible
@@ -648,9 +646,6 @@ task FilterCancerVariants {
         String scripts_path
         File input_vcf
 
-        File ref_fasta
-        File ref_fasta_index
-
         String base_name
         String docker
         Int preemptible
@@ -685,9 +680,9 @@ task FilterCancerVariants {
     >>>
 
     runtime {
-        disks: "local-disk " + ceil((size(ref_fasta, "GB") * 3) + 30) + " HDD"
+        disks: "local-disk " + ceil((size(input_vcf, "GB") * 12) + 30) + " HDD"
         docker: docker
-        memory: "2G"
+        memory: "8G"
         preemptible: preemptible
         cpu : 1
     }
