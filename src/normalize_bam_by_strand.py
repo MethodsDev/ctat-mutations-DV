@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--normalize_max_cov_level", type=int, default=1000, help="normalize to max read coverage level before assembly (default: 1000)")
     parser.add_argument("--read_start_bin_size", type=int, default=100, help="group alignments by start positions every --read_start_bin_size number of bases along the genome")
     parser.add_argument("--random_seed", type=int, default=42, help="random seed for reproducible sampling (default: 42)")
+    parser.add_argument("--use_bamsifter", action="store_true", help="use plugins/bamsifter for per-strand normalization instead of the in-tree pysam implementation")
 
 
     args = parser.parse_args()
@@ -35,6 +36,7 @@ def main():
     normalize_max_cov_level = args.normalize_max_cov_level
     read_start_bin_size = args.read_start_bin_size
     random_seed = args.random_seed
+    use_bamsifter = args.use_bamsifter
 
     random.seed(random_seed)
     logger.info(f"Using random seed: {random_seed}")
@@ -53,6 +55,7 @@ def main():
     pipeliner.add_commands([Command(cmd, "sep_by_strand.ok")])
     pipeliner.run()
 
+    bamsifter_prog = os.path.join(scriptdir, "../plugins/bamsifter/bamsifter")
     SS_bam_files = [SS_output_prefix + x for x in (".+.bam", ".-.bam") ]
 
     SS_norm_bam_files = list()
@@ -63,7 +66,10 @@ def main():
         norm_bam_checkpoint = norm_bam_filename + ".ok"
 
         if not os.path.exists(norm_bam_checkpoint):
-            sift_bam(SS_bam_file, norm_bam_filename, normalize_max_cov_level, read_start_bin_size)
+            if use_bamsifter:
+                sift_bam_with_bamsifter(SS_bam_file, norm_bam_filename, normalize_max_cov_level, bamsifter_prog)
+            else:
+                sift_bam(SS_bam_file, norm_bam_filename, normalize_max_cov_level, read_start_bin_size)
             subprocess.check_call(f"touch {norm_bam_checkpoint}", shell=True)
         
         SS_norm_bam_files.append(norm_bam_filename)
@@ -133,6 +139,24 @@ def sift_bam(SS_bam_file, norm_bam_filename, normalize_max_cov_level, read_start
     bam_writer.close()
     bamfile_reader.close()
     
+    return
+
+
+def sift_bam_with_bamsifter(SS_bam_file, norm_bam_filename, normalize_max_cov_level, bamsifter_prog):
+
+    if not os.path.exists(bamsifter_prog):
+        raise RuntimeError(f"bamsifter executable not found at: {bamsifter_prog}")
+
+    cmd = " ".join([
+        bamsifter_prog,
+        f"-c {normalize_max_cov_level}",
+        f"-o {norm_bam_filename}",
+        SS_bam_file,
+    ])
+
+    logger.info("Running bamsifter on %s", SS_bam_file)
+    subprocess.check_call(cmd, shell=True)
+
     return
 
     

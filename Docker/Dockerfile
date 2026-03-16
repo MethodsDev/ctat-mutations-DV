@@ -176,6 +176,11 @@ RUN git clone --recursive https://github.com/MethodsDev/ctat-mutations-DV.git ct
     cd ctat-mutations && \
     git checkout $CTAT_MUTATIONS_COMMIT && \
     git submodule update --init --recursive && \
+    cd plugins/bamsifter/htslib && \
+    autoreconf -i && \
+    cd /usr/local/src/ctat-mutations/plugins/bamsifter && \
+    make && \
+    cd /usr/local/src/ctat-mutations && \
     make
 
 # Docker cleanup - remove build dependencies but keep runtime dependencies
@@ -200,4 +205,3 @@ WORKDIR /usr/local/src/ctat-mutations
 # K8: 1.2
 # open-cravat: 2.1.0 (pinned for compatibility)
 # igv-reports: 1.9.0 (pinned for compatibility)
-

@@ -244,6 +244,7 @@ workflow ctat_mutations_DV {
             input:
             input_bam = select_first([StarAlign.bam, mm2.bam, bam]),
             max_coverage = normalize_max_cov_level,
+            use_bamsifter = !is_long_reads,
             scripts_path = scripts_path,
             docker = docker,
             preemptible = preemptible
@@ -1464,6 +1465,7 @@ task NormalizeBam {
     input {
         File input_bam
         Int max_coverage = 1000
+        Boolean use_bamsifter = false
         String scripts_path
         String docker
         Int preemptible
@@ -1475,12 +1477,13 @@ task NormalizeBam {
 
         set -euo pipefail
 
-        cmd="~{scripts_path}/normalize_bam_by_strand.py --input_bam ~{input_bam} --normalize_max_cov_level ~{max_coverage} --output_bam ~{output_bam_filename}"
+        cmd="~{scripts_path}/normalize_bam_by_strand.py --input_bam ~{input_bam} --normalize_max_cov_level ~{max_coverage} ~{if use_bamsifter then "--use_bamsifter" else ""} --output_bam ~{output_bam_filename}"
         comment="Normalized BAM by strand with max coverage ~{max_coverage} into ~{output_bam_filename}"
         pg_id="NormalizeBam_~{basename(output_bam_filename, ".bam")}"
 
         ~{scripts_path}/normalize_bam_by_strand.py --input_bam ~{input_bam} \
             --normalize_max_cov_level ~{max_coverage} \
+            ~{if use_bamsifter then "--use_bamsifter" else ""} \
             --output_bam ~{output_bam_filename}
 
         samtools view -H ~{output_bam_filename} > header.sam
