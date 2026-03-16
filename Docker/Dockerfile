@@ -166,19 +166,17 @@ RUN wget -q https://github.com/attractivechaos/k8/releases/download/v${K8_VERSIO
 ENV PATH=/usr/local/src/ctat-mutations/WDL/:/usr/local/src/ctat-mutations/src/:$PATH
 
 
-## MethodsDev CTAT mutations DV v5.0.0
+## MethodsDev CTAT mutations DV
 WORKDIR $SRC
-ENV CTAT_MUTATIONS_VERSION=5.0.1
-ENV CTAT_MUTATIONS_COMMIT=e3d76a37eaf9e644bc732930511964cfb3232f7d
+ENV CTAT_MUTATIONS_VERSION=5.0.2
+ENV CTAT_MUTATIONS_COMMIT=b89eb9a40d20e1a18b2d70ff7cc67b7c38889bd3
 
 # Clone from GitHub using specific commit
 RUN git clone --recursive https://github.com/MethodsDev/ctat-mutations-DV.git ctat-mutations && \
     cd ctat-mutations && \
     git checkout $CTAT_MUTATIONS_COMMIT && \
     git submodule update --init --recursive && \
-    cd plugins/bamsifter/htslib && \
-    autoreconf -i && \
-    cd /usr/local/src/ctat-mutations/plugins/bamsifter && \
+    cd plugins/bamsifter && \
     make && \
     cd /usr/local/src/ctat-mutations && \
     make
