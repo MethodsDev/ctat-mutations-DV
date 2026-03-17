@@ -865,16 +865,16 @@ task rename_vcf {
 
         echo "####### Final step: Renaming Vcf ########"
       
-        mv ~{input_vcf} ~{base_name}.vcf.gz
-        mv ~{input_vcf}.tbi ~{base_name}.vcf.gz.tbi
+        mv ~{input_vcf} ~{base_name}.annotated.vcf.gz
+        mv ~{input_vcf}.tbi ~{base_name}.annotated.vcf.gz.tbi
 
      >>>
 
 
 
     output {
-        File vcf = "~{base_name}.vcf.gz"
-        File vcf_index = "~{base_name}.vcf.gz.tbi"
+        File vcf = "~{base_name}.annotated.vcf.gz"
+        File vcf_index = "~{base_name}.annotated.vcf.gz.tbi"
     }
 	
     runtime {

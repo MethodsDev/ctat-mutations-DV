@@ -424,7 +424,7 @@ workflow ctat_mutations_DV {
                 input:
                     input_vcfs = select_all([dv_vcf, extra_dv_vcf]),
                     input_vcfs_indexes = [],
-                    output_vcf_name = sample_id + ".and.extra.vcf.gz",
+                    output_vcf_name = sample_id + ".deepvariant.and.extra.init.vcf.gz",
                     docker = docker,
                     preemptible = preemptible
             }
@@ -454,7 +454,7 @@ workflow ctat_mutations_DV {
                 input:
                     input_vcf = variant_vcf,
                     input_vcf_index = variant_vcf_index,
-                    base_name = sample_id,
+                    base_name = sample_id + ".deepvariant",
                     cravat_lib_tar_gz = cravat_lib_tar_gz,
                     cravat_lib_dir = cravat_lib_dir,
                     ref_fasta = ref_fasta,
@@ -494,7 +494,7 @@ workflow ctat_mutations_DV {
                 input:
                     input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
                     input_vcf_index = select_first([AnnotateVariants.vcf_index, variant_vcf_index]),
-                    base_name = sample_id,
+                    base_name = sample_id + ".deepvariant",
                     min_gq = deepvariant_min_gq,
                     min_qual = deepvariant_min_qual,
                     min_dp = deepvariant_min_dp,
@@ -508,7 +508,7 @@ workflow ctat_mutations_DV {
                 call FilterCancerVariants {
                     input:
                         input_vcf = FilterDeepVariantVCF.filtered_vcf,
-                        base_name = sample_id,
+                        base_name = sample_id + ".deepvariant",
                         scripts_path=scripts_path,
                         docker = docker,
                         preemptible = preemptible
@@ -990,19 +990,19 @@ task DeepVariant_cpu {
             --model_type=~{model_type} \
             --ref=~{ref_fasta} \
             --reads=~{input_bam} \
-            --output_vcf=~{sample_name}.vcf.gz \
+            --output_vcf=~{sample_name}.deepvariant.init.vcf.gz \
             --sample_name=~{sample_name} \
             --disable_small_model \
             --num_shards=~{num_shards} \
-            ~{if output_gvcf then "--output_gvcf=" + sample_name + ".g.vcf.gz" else ""} \
+            ~{if output_gvcf then "--output_gvcf=" + sample_name + ".deepvariant.g.vcf.gz" else ""} \
             ~{"--regions=" + intervals} \
             --intermediate_results_dir=intermediate_results
     >>>
 
     output {
-        File vcf = "~{sample_name}.vcf.gz"
-        File vcf_index = "~{sample_name}.vcf.gz.tbi"
-        Array[File] gvcf_files = glob("~{sample_name}.g.vcf.gz")
+        File vcf = "~{sample_name}.deepvariant.init.vcf.gz"
+        File vcf_index = "~{sample_name}.deepvariant.init.vcf.gz.tbi"
+        Array[File] gvcf_files = glob("~{sample_name}.deepvariant.g.vcf.gz")
     }
 
     runtime {
@@ -1041,19 +1041,19 @@ task DeepVariant_gpu {
             --model_type=~{model_type} \
             --ref=~{ref_fasta} \
             --reads=~{input_bam} \
-            --output_vcf=~{sample_name}.vcf.gz \
+            --output_vcf=~{sample_name}.deepvariant.init.vcf.gz \
             --sample_name=~{sample_name} \
             --disable_small_model \
             --num_shards=~{num_shards} \
-            ~{if output_gvcf then "--output_gvcf=" + sample_name + ".g.vcf.gz" else ""} \
+            ~{if output_gvcf then "--output_gvcf=" + sample_name + ".deepvariant.g.vcf.gz" else ""} \
             ~{"--regions=" + intervals} \
             --intermediate_results_dir=intermediate_results
     >>>
 
     output {
-        File vcf = "~{sample_name}.vcf.gz"
-        File vcf_index = "~{sample_name}.vcf.gz.tbi"
-        Array[File] gvcf_files = glob("~{sample_name}.g.vcf.gz")
+        File vcf = "~{sample_name}.deepvariant.init.vcf.gz"
+        File vcf_index = "~{sample_name}.deepvariant.init.vcf.gz.tbi"
+        Array[File] gvcf_files = glob("~{sample_name}.deepvariant.g.vcf.gz")
     }
 
     runtime {
