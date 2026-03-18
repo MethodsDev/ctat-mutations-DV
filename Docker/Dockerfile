@@ -145,16 +145,6 @@ ENV DEEPVARIANT_VERSION=1.9.0
 # Note: All DeepVariant models (RNASEQ, MASSEQ) are bundled in the google/deepvariant Docker image
 
 
-## flagCorrection - improves DeepVariant accuracy on long-read RNA-seq
-# Note: flagCorrection is an R script, but we'll skip installation for now
-# Users can run it separately if needed, or we can add R dependencies later
-# WORKDIR $SRC
-# RUN git clone https://github.com/vladimirsouza/lrRNAseqVariantCalling.git && \
-#     cd lrRNAseqVariantCalling/tools && \
-#     chmod +x flagCorrection.r && \
-#     cp flagCorrection.r /usr/local/bin/flagCorrection
-
-
 ## K8 1.2 (latest stable)
 ENV K8_VERSION=1.2
 WORKDIR $SRC

@@ -294,7 +294,7 @@ workflow ctat_mutations_DV {
 
     if( (!vcf_input) && (!variant_ready_bam) ) {
 
-        # For PacBio long reads: use custom SplitNCigarLongReads + flagCorrection
+        # For PacBio long reads: use custom SplitNCigarLongReads
         # For Illumina: SplitNCigarReads (GATK step) is not needed.
         # --model_type=RNASEQ causes make_examples to split reads at N-CIGAR junctions
         # into per-exon sub-reads, which the RNASEQ model (trained on GTEx) handles natively.
@@ -311,14 +311,6 @@ workflow ctat_mutations_DV {
                 preemptible = preemptible
             }
 
-            call flagCorrection {
-                input:
-                    input_bam = SplitNCigarLongReads.bam,
-                    input_bam_index = SplitNCigarLongReads.bai,
-                    base_name = sample_id + ".flagCorrected",
-                    docker = docker,
-                    preemptible = preemptible
-            }
         }
     }
 
@@ -384,9 +376,9 @@ workflow ctat_mutations_DV {
 
         # Determine BAM for variant calling based on read type and preprocessing
         # For Illumina: MarkDuplicates -> DeepVariant (no SplitNCigarReads needed)
-        # For PacBio: SplitNCigarLongReads -> flagCorrection -> DeepVariant
-        File bam_for_variant_calls = select_first([SplitReads.ref_bam, flagCorrection.bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
-        File bai_for_variant_calls = select_first([SplitReads.ref_bai, flagCorrection.bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
+        # For PacBio: SplitNCigarLongReads -> DeepVariant
+        File bam_for_variant_calls = select_first([SplitReads.ref_bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
+        File bai_for_variant_calls = select_first([SplitReads.ref_bai, SplitNCigarLongReads.bai, MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai])
 
         # DeepVariant variant calling (run_deepvariant handles sharding internally)
         if (!deepvariant_use_gpu) {
@@ -1076,42 +1068,6 @@ task DeepVariant_gpu {
         preemptible: preemptible
         gpuType: "nvidia-tesla-t4"
         gpuCount: 1
-    }
-}
-
-
-task flagCorrection {
-    input {
-        File input_bam
-        File input_bam_index
-        String base_name
-        String docker
-        Int preemptible
-        Int cpu = 4
-        Float memory = 16
-    }
-
-    command <<<
-        set -ex
-
-        # flagCorrection improves DeepVariant accuracy on long-read RNA-seq
-        # Corrects alignment flags for better variant calling
-        flagCorrection.sh ~{input_bam} ~{base_name}.corrected.bam
-
-        samtools index ~{base_name}.corrected.bam
-    >>>
-
-    output {
-        File bam = "~{base_name}.corrected.bam"
-        File bai = "~{base_name}.corrected.bam.bai"
-    }
-
-    runtime {
-        docker: docker
-        cpu: cpu
-        memory: memory + " GB"
-        disks: "local-disk " + ceil(size(input_bam, "GB") * 3 + 50) + " HDD"
-        preemptible: preemptible
     }
 }
 

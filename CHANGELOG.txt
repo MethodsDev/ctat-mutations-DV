@@ -44,7 +44,6 @@
 - ✅ DeepVariant variant calling with correct channel configuration (6 for Illumina, 9 for PacBio)
 - ✅ All annotations functional: snpEff, dbSNP, gnomAD, COSMIC, RNA editing, repeats, homopolymers, splice distance, PASS reads
 - ✅ IGV HTML report generation successful
-- ✅ flagCorrection integration for long reads (pass-through mode)
 
 ---
 
@@ -72,7 +71,7 @@
 
 - **Simplified Read Preprocessing**:
   - Illumina: Removed SplitNCigarReads task - --model_type=RNASEQ causes make_examples to split reads at N-CIGAR junctions into per-exon sub-reads, handled natively by the RNASEQ model
-  - PacBio: Uses custom SplitNCigarLongReads (cigar_N_splitter.py) + new flagCorrection step for optimal accuracy
+  - PacBio: Uses custom SplitNCigarLongReads (cigar_N_splitter.py) before DeepVariant
   - CLI parameter removed: --HC_xtra_args
 
 ### Major Additions
@@ -82,11 +81,6 @@
   - Built-in parallelization via sharding (replaces interval scattering)
   - GPU acceleration support (10-100x speedup for call_variants step)
   - gVCF output option
-
-- **flagCorrection** for PacBio long-read RNA-seq:
-  - Improves DeepVariant accuracy on PacBio Iso-Seq data
-  - Corrects alignment flags for better variant calling
-  - Recommended preprocessing step: SplitNCigarReads → flagCorrection → DeepVariant
 
 - **New CLI Parameters**:
   - --deepvariant_use_gpu: Enable GPU acceleration (default: false)
@@ -116,7 +110,7 @@
   - Uses WES model type + RNA customized model checkpoint
   - Uses empty channels parameter (channels='') for RNA-seq
 
-- **PacBio workflow**: Minimap2 → SplitNCigarLongReads → flagCorrection → DeepVariant
+- **PacBio workflow**: Minimap2 → SplitNCigarLongReads → DeepVariant
   - Official support for PacBio Iso-Seq and Kinnex MAS-Iso-Seq
   - Uses PACBIO model with specialized parameters
   - Significantly better accuracy than running DeepVariant directly on minimap2 output
@@ -139,7 +133,6 @@
 
 ### Docker Image Updates
 - Added DeepVariant v1.9.0 with RNA-seq and PacBio models
-- Added flagCorrection tool for long-read preprocessing
 - Added Picard wrapper script
 - Removed GATK 4.1.9.0 completely
 - Removed BLAT/pblat (only used for ED annotation in boosting)
@@ -165,8 +158,6 @@
 ### References & Citations
 - DeepVariant: Poplin, R., et al. (2018). Nature Biotechnology. DOI: 10.1038/nbt.4235
 - DeepVariant RNA-seq: Qi, W., et al. (2023). Bioinformatics Advances. DOI: 10.1093/bioadv/vbad062
-- flagCorrection: Souza, V., et al. lrRNAseqVariantCalling GitHub repository
-
 4.3.0 June 29, 2024
 - bugfix w/ cigar-N-splitter, incorporating the required read group ID in each alignment entry - impacts long read calling sensitivity
 
@@ -240,4 +231,3 @@
 - more robust variant annotation / multithreading
 - annot_PASS_reads on by default now (again), but there's an option to disable if necessary.
 - various bugfixes
-
