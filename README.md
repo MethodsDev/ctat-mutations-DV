@@ -96,7 +96,8 @@ Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
 - `--deepvariant_min_gq`: Minimum genotype quality for filtering (default: 18, recommended)
 - `--deepvariant_min_qual`: Minimum QUAL score (default: 20)
 - `--deepvariant_min_dp`: Minimum depth (default: 5)
-- GPU acceleration is available on Terra via `deepvariant_use_gpu` WDL input
+- `--deepvariant_use_gpu`: Request GPU-accelerated DeepVariant execution when supported by the execution environment
+- GPU acceleration is also available on Terra via `deepvariant_use_gpu` WDL input
 
 ### General Options
 

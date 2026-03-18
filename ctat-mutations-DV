@@ -141,6 +141,12 @@ def main():
     )
 
     parser.add_argument(
+        "--deepvariant_use_gpu",
+        action="store_true",
+        help="Use GPU acceleration for DeepVariant when supported by the execution environment",
+    )
+
+    parser.add_argument(
         "--cpu",
         type=int,
         help="Number of CPUs for multi-threaded steps (e.g. STAR, variant position annotation)",
@@ -257,6 +263,7 @@ def main():
     deepvariant_min_gq = args.deepvariant_min_gq
     deepvariant_min_qual = args.deepvariant_min_qual
     deepvariant_min_dp = args.deepvariant_min_dp
+    deepvariant_use_gpu = args.deepvariant_use_gpu
     cell_barcode_bam_tag = args.cell_barcode_bam_tag
     umi_bam_tag = args.umi_bam_tag
 
@@ -422,10 +429,12 @@ def main():
     input_json["deepvariant_min_gq"] = deepvariant_min_gq
     input_json["deepvariant_min_qual"] = deepvariant_min_qual
     input_json["deepvariant_min_dp"] = deepvariant_min_dp
+    input_json["deepvariant_use_gpu"] = deepvariant_use_gpu
 
     input_json["docker"] = "trinityctat/ctat_mutations:5.0.0"
     # Using DeepVariant v1.10.0 (native RNA-seq model)
     input_json["deepvariant_docker"] = "google/deepvariant:1.10.0"
+    input_json["deepvariant_docker_gpu"] = "google/deepvariant:1.10.0-gpu"
     if args.star_limitBAMsortRAM:
         input_json["star_limitBAMsortRAM"] = args.star_limitBAMsortRAM
 
