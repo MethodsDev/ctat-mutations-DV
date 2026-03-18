@@ -75,7 +75,7 @@ Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
 
 ### General Options
 
-- `--genome_lib_dir`: Path to CTAT genome library (see [genome lib guide](https://github.com/NCIP/ctat-mutations/wiki))
+- `--genome_lib_dir`: Path to CTAT genome library (see installation section below)
 - `--cpu`: Number of CPUs for multi-threaded steps
 - `--variant_ready_bam`: Skip preprocessing (use for pre-processed BAMs)
 - `--is_long_reads`: Use minimap2 for PacBio data
