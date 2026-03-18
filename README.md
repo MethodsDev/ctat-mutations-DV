@@ -15,13 +15,6 @@ CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
 - **Cancer Variant Reporting**: Specialized filtering and IGV report generation for cancer variants
 
 
-## Quick Start
-
-### Docker/Singularity (Recommended)
-
-```bash
-# Docker
-docker pull trinityctat/ctat_mutations_dv:latest
 
 # Run with FASTQs
 ./ctat-mutations-DV \
@@ -122,6 +115,9 @@ cd ctat-mutations-DV
 make
 ```
 
+### Required CTAT Genome Lib
+
+For now, we reuse the ctat genome lib for the old ctat-mutations software, and so see these earlier [data library installation instructions](https://github.com/TrinityCTAT/ctat-mutations/wiki/CTAT-mutations-installation).
 
 
 ## Citations for CTAT-Mutations-DV workflow components
