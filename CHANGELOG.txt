@@ -71,7 +71,7 @@
   - CLI parameter removed: --no_bqsr
 
 - **Simplified Read Preprocessing**:
-  - Illumina: Removed SplitNCigarReads task - DeepVariant handles spliced reads internally with split_skip_reads=true
+  - Illumina: Removed SplitNCigarReads task - --model_type=RNASEQ causes make_examples to split reads at N-CIGAR junctions into per-exon sub-reads, handled natively by the RNASEQ model
   - PacBio: Uses custom SplitNCigarLongReads (cigar_N_splitter.py) + new flagCorrection step for optimal accuracy
   - CLI parameter removed: --HC_xtra_args
 
@@ -112,7 +112,7 @@
 
 ### RNA-seq Specific Optimizations
 - **Illumina workflow**: STAR → MarkDuplicates → DeepVariant (no SplitNCigarReads needed)
-  - DeepVariant handles spliced reads internally with split_skip_reads=true parameter
+  - --model_type=RNASEQ handles spliced reads natively: make_examples splits reads at N-CIGAR junctions into per-exon sub-reads
   - Uses WES model type + RNA customized model checkpoint
   - Uses empty channels parameter (channels='') for RNA-seq
 

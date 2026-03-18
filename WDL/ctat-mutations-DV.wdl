@@ -295,7 +295,9 @@ workflow ctat_mutations_DV {
     if( (!vcf_input) && (!variant_ready_bam) ) {
 
         # For PacBio long reads: use custom SplitNCigarLongReads + flagCorrection
-        # For Illumina: skip SplitNCigarReads (DeepVariant handles internally with split_skip_reads=true)
+        # For Illumina: SplitNCigarReads (GATK step) is not needed.
+        # --model_type=RNASEQ causes make_examples to split reads at N-CIGAR junctions
+        # into per-exon sub-reads, which the RNASEQ model (trained on GTEx) handles natively.
         if (is_long_reads) {
             call SplitNCigarLongReads {
                 input:

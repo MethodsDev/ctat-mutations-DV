@@ -20,7 +20,7 @@ All intermediate files are managed automatically via `--intermediate_results_dir
 
 | Input Type | `--model_type` | Model Path | Notes |
 |------------|---------------|------------|-------|
-| Illumina RNA-seq | `RNASEQ` | `/opt/models/rnaseq` | Native RNA-seq model, auto-configures `split_skip_reads` |
+| Illumina RNA-seq | `RNASEQ` | `/opt/models/rnaseq` | Native RNA-seq model; make_examples splits reads at N-CIGAR junctions into per-exon sub-reads |
 | PacBio/ONT long reads | `MASSEQ` | `/opt/models/masseq` | Used after SplitNCigarReads + flagCorrection preprocessing |
 
 All models are bundled in the `google/deepvariant:1.10.0` Docker image.
