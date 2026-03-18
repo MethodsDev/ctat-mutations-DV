@@ -1,6 +1,6 @@
-# ctat-mutations
+# ctat-mutations-DV
 
-RNA-seq variant calling pipeline using DeepVariant with state-of-the-art accuracy.
+RNA-seq variant calling pipeline using DeepVariant.
 
 **Version 5.0.0** - Major refactor with DeepVariant integration
 
