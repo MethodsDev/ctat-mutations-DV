@@ -210,6 +210,16 @@ def main():
         default=False,
         help="single cell transcriptome reads used - note read name formatting required as: cellbarcode^UMI^readname to be recognized.",
     )
+    parser.add_argument(
+        "--cell_barcode_bam_tag",
+        default="CB",
+        help="BAM tag containing the cell barcode for single-cell mode",
+    )
+    parser.add_argument(
+        "--umi_bam_tag",
+        default="XM",
+        help="BAM tag containing the UMI for single-cell mode",
+    )
 
     # parser.add_argument(
     #     "--star_memory",
@@ -247,6 +257,8 @@ def main():
     deepvariant_min_gq = args.deepvariant_min_gq
     deepvariant_min_qual = args.deepvariant_min_qual
     deepvariant_min_dp = args.deepvariant_min_dp
+    cell_barcode_bam_tag = args.cell_barcode_bam_tag
+    umi_bam_tag = args.umi_bam_tag
 
     output_directory = args.outputdir
 
@@ -369,6 +381,9 @@ def main():
 
     if args.is_single_cells:
         input_json["singlecell_mode"] = True
+
+    input_json["cell_barcode_bam_tag"] = cell_barcode_bam_tag
+    input_json["umi_bam_tag"] = umi_bam_tag
 
     input_json["star_cpu"] = cpu
     input_json["variant_filtration_cpu"] = cpu

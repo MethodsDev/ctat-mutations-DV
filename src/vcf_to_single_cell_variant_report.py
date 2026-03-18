@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 BAM_READER = None
+CELL_BARCODE_BAM_TAG = "CB"
+UMI_BAM_TAG = "XM"
 
 
 def progress_bar(progress_percent):
@@ -37,17 +39,19 @@ def chunk_lines(lines, num_chunks):
 
 
 def parse_sc_read_name(read):
-    cb = read.get_tag("CB") if read.has_tag("CB") else None
-    umi = read.get_tag("XM") if read.has_tag("XM") else None
+    cb = read.get_tag(CELL_BARCODE_BAM_TAG) if read.has_tag(CELL_BARCODE_BAM_TAG) else None
+    umi = read.get_tag(UMI_BAM_TAG) if read.has_tag(UMI_BAM_TAG) else None
     if cb or umi:
         return "{}^{}^{}".format(cb or "NA", umi or "NA", read.query_name)
 
     return read.query_name
 
 
-def init_worker_bam_reader(bam_file):
-    global BAM_READER
+def init_worker_bam_reader(bam_file, cell_barcode_bam_tag, umi_bam_tag):
+    global BAM_READER, CELL_BARCODE_BAM_TAG, UMI_BAM_TAG
     BAM_READER = pysam.AlignmentFile(bam_file, "rb")
+    CELL_BARCODE_BAM_TAG = cell_barcode_bam_tag
+    UMI_BAM_TAG = umi_bam_tag
 
 
 def close_worker_bam_reader():
@@ -137,15 +141,17 @@ def process_chunk(chunk_index, vcf_lines):
 
 
 class VariantReportBuilder:
-    def __init__(self, input_vcf, bam_file, threads, chunks, output_file):
+    def __init__(self, input_vcf, bam_file, threads, chunks, output_file, cell_barcode_bam_tag, umi_bam_tag):
         self.input_vcf = input_vcf
         self.bam_file = bam_file
         self.threads = threads
         self.chunks = chunks
         self.output_file = output_file
+        self.cell_barcode_bam_tag = cell_barcode_bam_tag
+        self.umi_bam_tag = umi_bam_tag
 
         message_str = f"""
-            {'Single Cell Variant Report':^30s}\n\t{'VCF':11s} : {input_vcf}\n\t{'BAM':11s} : {bam_file}\n\t{'CPU count':11s} : {threads}\n\t{'Chunking':11s} : {chunks}"""
+            {'Single Cell Variant Report':^30s}\n\t{'VCF':11s} : {input_vcf}\n\t{'BAM':11s} : {bam_file}\n\t{'CPU count':11s} : {threads}\n\t{'Chunking':11s} : {chunks}\n\t{'Cell tag':11s} : {cell_barcode_bam_tag}\n\t{'UMI tag':11s} : {umi_bam_tag}"""
         logger.info(message_str)
 
     def load_vcf(self):
@@ -167,7 +173,11 @@ class VariantReportBuilder:
             results[chunk_index] = chunk_result
 
         if self.threads > 1:
-            pool = multiprocessing.Pool(self.threads, initializer=init_worker_bam_reader, initargs=(self.bam_file,))
+            pool = multiprocessing.Pool(
+                self.threads,
+                initializer=init_worker_bam_reader,
+                initargs=(self.bam_file, self.cell_barcode_bam_tag, self.umi_bam_tag),
+            )
 
             def error_handler(error):
                 logger.error("ERROR_HANDLER - CAUGHT: " + str(error))
@@ -175,7 +185,7 @@ class VariantReportBuilder:
                 pool.join()
                 sys.exit(2)
         else:
-            init_worker_bam_reader(self.bam_file)
+            init_worker_bam_reader(self.bam_file, self.cell_barcode_bam_tag, self.umi_bam_tag)
 
         message_str = f"\t\tStart Time: {time.asctime(time.localtime(time.time()))}"
         logger.info(message_str)
@@ -256,6 +266,8 @@ def main():
     parser.add_argument("--output", type=str, required=True, help="Output report filename.")
     parser.add_argument("--threads", type=int, default=8, help="Number of CPUs to use.")
     parser.add_argument("--chunks", type=int, default=1000, help="Number of chunks to divide the VCF into.")
+    parser.add_argument("--cell_barcode_bam_tag", type=str, default="CB", help="BAM tag containing the cell barcode.")
+    parser.add_argument("--umi_bam_tag", type=str, default="XM", help="BAM tag containing the UMI.")
     parser.add_argument("--debug", "-d", action="store_true", default=False, help="Debug mode, verbose.")
 
     args = parser.parse_args()
@@ -273,6 +285,8 @@ def main():
         threads=args.threads,
         chunks=args.chunks,
         output_file=args.output,
+        cell_barcode_bam_tag=args.cell_barcode_bam_tag,
+        umi_bam_tag=args.umi_bam_tag,
     ).load_vcf().build().write_output()
 
 

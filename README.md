@@ -79,6 +79,28 @@ See the [Wiki](https://github.com/NCIP/ctat-mutations/wiki) for full documentati
     --cpu 16
 ```
 
+### Single-Cell BAM Tag Configuration
+
+For single-cell mode, the pipeline can read cell barcode and UMI values directly from BAM tags.
+Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
+
+```bash
+./ctat-mutations-DV \
+    --bam aligned.bam \
+    --genome_lib_dir /path/to/ctat_genome_lib \
+    --sample_id my_sample \
+    --is_single_cells \
+    --cell_barcode_bam_tag CB \
+    --umi_bam_tag XM
+```
+
+These values are also exposed as WDL inputs:
+
+- `cell_barcode_bam_tag` default `CB`
+- `umi_bam_tag` default `XM`
+
+The configured tags are preserved through long-read `SplitNCigarLongReads` preprocessing and are used by the single-cell variant report.
+
 ## Key Parameters
 
 ### DeepVariant Configuration
@@ -96,6 +118,8 @@ See the [Wiki](https://github.com/NCIP/ctat-mutations/wiki) for full documentati
 - `--cpu`: Number of CPUs for multi-threaded steps
 - `--variant_ready_bam`: Skip preprocessing (use for pre-processed BAMs)
 - `--is_long_reads`: Use minimap2 for PacBio/ONT data
+- `--cell_barcode_bam_tag`: BAM tag containing the cell barcode in single-cell mode (default: `CB`)
+- `--umi_bam_tag`: BAM tag containing the UMI in single-cell mode (default: `XM`)
 
 ## Resource Requirements
 

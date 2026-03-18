@@ -72,6 +72,8 @@ workflow ctat_mutations_DV {
         Int variant_annotation_cpu = 5
 
         Boolean singlecell_mode = false
+        String cell_barcode_bam_tag = "CB"
+        String umi_bam_tag = "XM"
 
         Boolean normalize_bam = true
         Int normalize_max_cov_level = 1000
@@ -299,6 +301,8 @@ workflow ctat_mutations_DV {
                 input:
                 input_bam = select_first([MarkDuplicates.bam, NormalizeBam.output_bam, mm2.bam, bam]),
                 input_bam_index = select_first([MarkDuplicates.bai, NormalizeBam.output_bai, mm2.bai, bai]),
+                cell_barcode_bam_tag = cell_barcode_bam_tag,
+                umi_bam_tag = umi_bam_tag,
                 scripts_path = scripts_path,
                 memory = split_n_cigar_reads_memory,
                 docker = docker,
@@ -537,6 +541,8 @@ workflow ctat_mutations_DV {
                     input_vcf = select_first([FilterDeepVariantVCF.filtered_vcf, AnnotateVariants.vcf, variant_vcf]),
                     bam = pass_read_eval_bam,
                     bam_index = pass_read_eval_bai,
+                    cell_barcode_bam_tag = cell_barcode_bam_tag,
+                    umi_bam_tag = umi_bam_tag,
                     base_name = sample_id,
                     scripts_path = scripts_path,
                     docker = docker,
@@ -572,6 +578,8 @@ task single_cell_report {
         File input_vcf
         File bam
         File bam_index
+        String cell_barcode_bam_tag = "CB"
+        String umi_bam_tag = "XM"
         String base_name
         String scripts_path
 
@@ -592,6 +600,8 @@ task single_cell_report {
         ~{scripts_path}/vcf_to_single_cell_variant_report.py \
             --vcf ~{input_vcf}  \
             --bam input.bam \
+            --cell_barcode_bam_tag ~{cell_barcode_bam_tag} \
+            --umi_bam_tag ~{umi_bam_tag} \
             --output ~{base_name}.single_cell_variant_report.tsv \
             --threads ~{cpu}
 
@@ -1395,6 +1405,8 @@ task SplitNCigarLongReads {
     input {
         File input_bam
         File input_bam_index
+        String cell_barcode_bam_tag = "CB"
+        String umi_bam_tag = "XM"
         String scripts_path
         Float memory = 8
         
@@ -1409,11 +1421,14 @@ task SplitNCigarLongReads {
         set -euo pipefail
         # monitor_script.sh &
 
-        cmd="~{scripts_path}/cigar_N_splitter.py ~{input_bam} split_N.bam; samtools sort split_N.bam -o ~{output_bam_filename}"
+        cmd="~{scripts_path}/cigar_N_splitter.py --cell_barcode_bam_tag ~{cell_barcode_bam_tag} --umi_bam_tag ~{umi_bam_tag} ~{input_bam} split_N.bam; samtools sort split_N.bam -o ~{output_bam_filename}"
         comment="Split reads on N CIGAR operations and sorted into ~{output_bam_filename}"
         pg_id="SplitNCigarLongReads_~{basename(output_bam_filename, ".bam")}"
 
-        ~{scripts_path}/cigar_N_splitter.py ~{input_bam}  split_N.bam
+        ~{scripts_path}/cigar_N_splitter.py \
+            --cell_barcode_bam_tag ~{cell_barcode_bam_tag} \
+            --umi_bam_tag ~{umi_bam_tag} \
+            ~{input_bam} split_N.bam
 
         samtools sort split_N.bam -o ~{output_bam_filename}
 

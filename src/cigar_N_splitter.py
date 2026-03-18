@@ -1,24 +1,51 @@
 #!/usr/bin/env python
 
 import sys, os, re
+import argparse
 import pysam
 
 
 DEBUG = False
+CELL_BARCODE_BAM_TAG = "CB"
+UMI_BAM_TAG = "XM"
 
 def main():
     
-    usage = "\n\n\tusage: {} input.bam output.bam [DEBUG_flag]\n\n".format(sys.argv[0])
+    parser = argparse.ArgumentParser(
+        description="Split BAM alignments on N CIGAR operators while preserving selected tags."
+    )
+    parser.add_argument("input_bam", type=str, help="input bam filename")
+    parser.add_argument("output_bam", type=str, help="output bam filename")
+    parser.add_argument(
+        "--cell_barcode_bam_tag",
+        default="CB",
+        help="BAM tag containing the cell barcode to preserve on split reads",
+    )
+    parser.add_argument(
+        "--umi_bam_tag",
+        default="XM",
+        help="BAM tag containing the UMI to preserve on split reads",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="enable verbose debug output",
+    )
 
-    if len(sys.argv) < 3:
-        exit(usage)
+    args = parser.parse_args()
 
-    input_bam = sys.argv[1]
-    output_bam = sys.argv[2]
+    input_bam = args.input_bam
+    output_bam = args.output_bam
 
     global DEBUG
-    if len(sys.argv) > 3:
-        DEBUG = True
+    DEBUG = args.debug
+
+    global CELL_BARCODE_BAM_TAG
+    CELL_BARCODE_BAM_TAG = args.cell_barcode_bam_tag
+
+    global UMI_BAM_TAG
+    UMI_BAM_TAG = args.umi_bam_tag
 
     
     bam_reader = pysam.AlignmentFile(input_bam, "rb")
@@ -174,12 +201,19 @@ def make_split_read(read, read_seq, read_quals, read_start, read_pos, genome_sta
 
     if split_read_quals is not None:
         a.query_qualities = split_read_quals   #pysam.qualitystring_to_array("<<<<<<<<<<<<<<<<<<<<<:<9/,&,22;;<<<")
-    #a.tags = (("NM", 1),
-    #          ("RG", "L1"))
+
+    tags_to_preserve = []
 
     if read.has_tag("RG"):
-        rg = read.get_tag("RG", "Z")[0]
-        a.set_tags( [("RG", rg, "Z") ] )
+        tags_to_preserve.append(("RG", read.get_tag("RG"), "Z"))
+
+    # Preserve single-cell metadata tags needed downstream by the report code.
+    for sc_tag in (CELL_BARCODE_BAM_TAG, UMI_BAM_TAG):
+        if read.has_tag(sc_tag):
+            tags_to_preserve.append((sc_tag, read.get_tag(sc_tag), "Z"))
+
+    if tags_to_preserve:
+        a.set_tags(tags_to_preserve)
     
     return a
 

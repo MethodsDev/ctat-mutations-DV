@@ -55,6 +55,8 @@ workflow ctat_mutations_Terra {
     Boolean is_long_reads = false
     Boolean annotate_variants = true
     Boolean singlecell_mode = false
+    String cell_barcode_bam_tag = "CB"
+    String umi_bam_tag = "XM"
     Int normalize_max_cov_level = 1000
     Int? preemptible
     Ctat_mutations_config pipe_inputs_config
@@ -87,6 +89,8 @@ workflow ctat_mutations_Terra {
       intervals = intervals,
       annotate_variants = annotate_variants,
       singlecell_mode = singlecell_mode,
+      cell_barcode_bam_tag = cell_barcode_bam_tag,
+      umi_bam_tag = umi_bam_tag,
       normalize_max_cov_level = normalize_max_cov_level,
 
       is_long_reads = is_long_reads,
