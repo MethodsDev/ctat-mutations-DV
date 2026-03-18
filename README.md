@@ -22,7 +22,7 @@ CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
   - Native RNA-seq model (no longer requires WES model workaround)
   - Auto-configured model parameters via `model.example_info.json`
   - Improved multiallelic variant post-processing ("product" method)
-  - F1 score 0.933 on CDS regions (vs GATK's lower performance)
+
 
 - **Simplified Pipeline**:
   - Removed BQSR (base quality score recalibration) - no longer needed
@@ -34,19 +34,13 @@ CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
   - **Illumina**: Native RNA-seq model with auto-configured `split_skip_reads` and `min_mapping_quality`
   - **PacBio**: Uses SplitNCigarReads + flagCorrection preprocessing with MasSeq model
 
-### Performance
-
-- **Accuracy**: 0.998 SNP precision, 0.989 INDEL precision at GQ ≥ 18
-- **Speed**: 25% faster than v4.x GATK-based pipeline
-- **GPU Support**: Optional GPU acceleration on Terra via `deepvariant_use_gpu` WDL input
-
 ## Quick Start
 
 ### Docker/Singularity (Recommended)
 
 ```bash
 # Docker
-docker pull trinityctat/ctat_mutations:latest
+docker pull trinityctat/ctat_mutations_dv:latest
 
 # Run with FASTQs
 ./ctat-mutations-DV \
@@ -60,13 +54,11 @@ docker pull trinityctat/ctat_mutations:latest
 ./ctat-mutations-DV \
     --bam aligned.bam \
     --genome_lib_dir /path/to/ctat_genome_lib \
-    --sample_id my_sample \
-    --variant_ready_bam
+    --sample_id my_sample
 
 # GPU acceleration is available on Terra (set deepvariant_use_gpu = true in WDL inputs)
 ```
 
-See the [Wiki](https://github.com/NCIP/ctat-mutations/wiki) for full documentation.
 
 ### Long Read Support (PacBio/ONT)
 
@@ -94,12 +86,6 @@ Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
     --umi_bam_tag XM
 ```
 
-These values are also exposed as WDL inputs:
-
-- `cell_barcode_bam_tag` default `CB`
-- `umi_bam_tag` default `XM`
-
-The configured tags are preserved through long-read `SplitNCigarLongReads` preprocessing and are used by the single-cell variant report.
 
 ## Key Parameters
 
