@@ -8,31 +8,12 @@ RNA-seq variant calling pipeline using DeepVariant with state-of-the-art accurac
 
 CTAT-Mutations is a comprehensive RNA-seq variant calling pipeline that:
 
-- **Variant Calling**: Uses Google DeepVariant v1.10.0 with native RNA-seq model
-- **Alignment**: Supports STAR (Illumina short reads) and Minimap2 (PacBio/ONT long reads)
+- **Variant Calling**: Uses Google DeepVariant v1.10.0 with native RNA-seq model for short (Illumina) or long (PacBio) RNA-seq reads
+- **Alignment**: Supports STAR (Illumina short reads) and Minimap2 (PacBio long reads)
 - **Annotation**: Integrates dbSNP, gnomAD, COSMIC, CRAVAT, and custom RNA-specific annotations
 - **Filtering**: Quality-based filtering using DeepVariant's neural network scores
 - **Cancer Variant Reporting**: Specialized filtering and IGV report generation for cancer variants
 
-## What's New in v5.0.0
-
-### Major Changes
-
-- **DeepVariant Integration**: Replaced GATK HaplotypeCaller with DeepVariant v1.10.0
-  - Native RNA-seq model (no longer requires WES model workaround)
-  - Auto-configured model parameters via `model.example_info.json`
-  - Improved multiallelic variant post-processing ("product" method)
-
-
-- **Simplified Pipeline**:
-  - Removed BQSR (base quality score recalibration) - no longer needed
-  - Removed ML boosting methods (XGBoost, AdaBoost, etc.) - replaced by DeepVariant's neural network
-  - Removed GATK dependency entirely
-  - Streamlined filtering using DeepVariant quality scores (GQ ≥ 18 recommended)
-
-- **RNA-seq Specific Optimizations**:
-  - **Illumina**: Native RNA-seq model with auto-configured `split_skip_reads` and `min_mapping_quality`
-  - **PacBio**: Uses SplitNCigarReads + flagCorrection preprocessing with MasSeq model
 
 ## Quick Start
 
@@ -56,11 +37,11 @@ docker pull trinityctat/ctat_mutations_dv:latest
     --genome_lib_dir /path/to/ctat_genome_lib \
     --sample_id my_sample
 
-# GPU acceleration is available on Terra (set deepvariant_use_gpu = true in WDL inputs)
+   #GPU acceleration is available: --deepvariant_use_gpu)
 ```
 
 
-### Long Read Support (PacBio/ONT)
+### Long Read Support (PacBio)
 
 ```bash
 ./ctat-mutations-DV \
@@ -97,27 +78,22 @@ Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
 - `--deepvariant_min_qual`: Minimum QUAL score (default: 20)
 - `--deepvariant_min_dp`: Minimum depth (default: 5)
 - `--deepvariant_use_gpu`: Request GPU-accelerated DeepVariant execution when supported by the execution environment
-- GPU acceleration is also available on Terra via `deepvariant_use_gpu` WDL input
+
 
 ### General Options
 
 - `--genome_lib_dir`: Path to CTAT genome library (see [genome lib guide](https://github.com/NCIP/ctat-mutations/wiki))
 - `--cpu`: Number of CPUs for multi-threaded steps
 - `--variant_ready_bam`: Skip preprocessing (use for pre-processed BAMs)
-- `--is_long_reads`: Use minimap2 for PacBio/ONT data
+- `--is_long_reads`: Use minimap2 for PacBio data
 - `--cell_barcode_bam_tag`: BAM tag containing the cell barcode in single-cell mode (default: `CB`)
 - `--umi_bam_tag`: BAM tag containing the UMI in single-cell mode (default: `XM`)
 
 ## Resource Requirements
 
-### Illumina Short Reads
 - **CPU**: 16+ cores recommended
 - **Memory**: 32-64 GB
 - **GPU** (optional): NVIDIA Tesla T4 or better for 10-100x speedup
-
-### PacBio Long Reads
-- **CPU**: 16+ cores recommended
-- **Memory**: 32-64 GB
 - **Disk**: ~2-3x input BAM size
 
 ## Output Files
@@ -135,44 +111,30 @@ Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
 ### Using Docker (Easiest)
 
 ```bash
-docker pull trinityctat/ctat_mutations:latest
+docker pull trinityctat/ctat_mutations_dv:latest
 ```
 
 ### From Source
 
 ```bash
-git clone --recursive https://github.com/NCIP/ctat-mutations.git
-cd ctat-mutations
+git clone --recursive git@github.com:MethodsDev/ctat-mutations-DV.git
+cd ctat-mutations-DV
 make
 ```
 
-## Documentation
 
-- **Full Documentation**: [Wiki](https://github.com/NCIP/ctat-mutations/wiki)
-- **Docker/Singularity Guide**: [ctat_mutations_docker_singularity](https://github.com/NCIP/ctat-mutations/wiki/ctat_mutations_docker_singularity)
-- **Genome Library Setup**: [CTAT Genome Lib](https://github.com/NCIP/ctat-mutations/wiki)
 
-## Migration from v4.x
+## Citations for CTAT-Mutations-DV workflow components
 
-Version 5.0.0 introduces breaking changes. Key differences:
-
-- **No boosting parameters**: `--boosting_method`, `--boosting_alg_type` removed
-- **No BQSR**: `--no_bqsr` parameter removed (BQSR not needed)
-- **New filtering**: Uses DeepVariant GQ scores instead of GATK FS/QD metrics
-- **Output naming**: `deepvariant_vcf` instead of `haplotype_caller_vcf`
-
-## Citation
-
-If you use CTAT-Mutations, please cite:
-
-- **DeepVariant**: Poplin, R., et al. (2018). A universal SNP and small-indel variant caller using deep neural networks. Nature Biotechnology.
 - **DeepVariant RNA-seq**: Qi, W., et al. (2023). A deep-learning method for the accurate and fast calling of variants from RNA sequencing data. Bioinformatics Advances.
 
-## Support
+- **STAR aligner for Illumina RNA-seq**: STAR aligner: STAR: ultrafast universal RNA-seq aligner. Dobin A, Davis CA, Schlesinger F, Drenkow J, Zaleski C, Jha S, Batut P, Chaisson M, Gingeras TR. Bioinformatics. 2013 Jan 1;29(1):15-21. doi: 10.1093/bioinformatics/bts635. Epub 2012 Oct 25. PMID: 23104886
 
-- **Issues**: [GitHub Issues](https://github.com/NCIP/ctat-mutations/issues)
-- **Wiki**: [Documentation](https://github.com/NCIP/ctat-mutations/wiki)
+- **Minimap2 for PacBio Kinnex/MAS-Iso-Seq**: Li H. Minimap2: pairwise alignment for nucleotide sequences. Bioinformatics. 2018 Sep 15;34(18):3094-3100. doi: 10.1093/bioinformatics/bty191. PMID: 29750242; PMCID: PMC6137996.
 
-## License
+- **SnpEff**: Cingolani P. Variant Annotation and Functional Prediction: SnpEff. Methods Mol Biol. 2022;2493:289-314. doi: 10.1007/978-1-0716-2293-3_19. PMID: 35751823.
 
-See LICENSE file for details.
+- **Rediportal**: Picardi E, D'Erchia AM, Lo Giudice C, Pesole G. REDIportal: a comprehensive database of A-to-I RNA editing events in humans. Nucleic Acids Res. 2017 Jan 4;45(D1):D750-D757. doi: 10.1093/nar/gkw767. Epub 2016 Sep 1. PMID: 27587585; PMCID: PMC5210607.
+
+
+
