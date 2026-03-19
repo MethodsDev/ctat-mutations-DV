@@ -105,20 +105,23 @@ Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
 
 Find our GRCh38 preconfigured workflow on [Dockstore](https://dockstore.org/workflows/github.com/MethodsDev/ctat-mutations-DV/hg38_ctat-mutations-DV:master?tab=info).
 
+
+### Off the cloud?
+
+ctat-mutations-DV is executed via a WDL workflow and leverages Docker images to complete various tasks including the execution of Deep Variant.
+
+The ctat-mutations-DV driver application configures the WDL workflow and then runs Cromwell to execute the workflow.
     
-### Using Docker (Easiest)
+Assuming you have Docker installed, you can pull down the ctat-mutations-DV code like so:
+git clone git@github.com:MethodsDev/ctat-mutations-DV.git && cd ctat-mutations-DV && ./download_cromwell.sh
 
-```bash
-docker pull trinityctat/ctat_mutations_dv:latest
-```
+Then (after installing the CTAT genome lib below), to run a short (~20 minute) test execution of the pipeline, you can
 
-### From Source
+    cd testing/
+    make
 
-```bash
-git clone --recursive git@github.com:MethodsDev/ctat-mutations-DV.git
-cd ctat-mutations-DV
-make
-```
+which will execute ctat-mutations-DV on an small set of pacbio long reads included.
+
 
 ### Required CTAT Genome Lib
 
