@@ -142,9 +142,8 @@ workflow ctat_mutations_Terra {
         File variant_calling_bam = CM_wf.variant_calling_bam
         File variant_calling_bai = CM_wf.variant_calling_bai
 
-        # Annotated and filtered VCFs
+        # Annotated VCF
         File? annotated_vcf = CM_wf.annotated_vcf
-        File? filtered_vcf = CM_wf.filtered_vcf
 
         # Alignment outputs
         File? aligned_bam = CM_wf.aligned_bam

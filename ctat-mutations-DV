@@ -72,7 +72,7 @@ def main():
     )
     parser.add_argument(
         "--vcf",
-        help="Previously generated vcf file to annotate and filter.",
+        help="Previously generated vcf file to annotate or use directly for downstream reporting.",
     )
 
     parser.add_argument("--sample_id", required=True, help="Sample id")
@@ -103,7 +103,7 @@ def main():
     parser.add_argument(
         "--filter_ready_vcf",
         action="store_true",
-        help="a fully annotated vcf is provided, so move directly on to filtering",
+        help="a fully annotated vcf is provided, so skip annotation and use it directly for downstream reporting",
     )
 
     parser.add_argument(
@@ -117,27 +117,6 @@ def main():
         "--output_gvcf",
         action="store_true",
         help="Output gVCF file in addition to VCF",
-    )
-
-    parser.add_argument(
-        "--deepvariant_min_gq",
-        type=int,
-        default=18,
-        help="Minimum genotype quality (GQ) for DeepVariant filtering. Recommended: 18 for high precision.",
-    )
-
-    parser.add_argument(
-        "--deepvariant_min_qual",
-        type=int,
-        default=20,
-        help="Minimum QUAL score for DeepVariant filtering",
-    )
-
-    parser.add_argument(
-        "--deepvariant_min_dp",
-        type=int,
-        default=5,
-        help="Minimum depth (DP) for DeepVariant filtering",
     )
 
     parser.add_argument(
@@ -260,9 +239,6 @@ def main():
     cpu = args.cpu
     deepvariant_shards = args.deepvariant_shards
     output_gvcf = args.output_gvcf
-    deepvariant_min_gq = args.deepvariant_min_gq
-    deepvariant_min_qual = args.deepvariant_min_qual
-    deepvariant_min_dp = args.deepvariant_min_dp
     deepvariant_use_gpu = args.deepvariant_use_gpu
     cell_barcode_bam_tag = args.cell_barcode_bam_tag
     umi_bam_tag = args.umi_bam_tag
@@ -393,7 +369,6 @@ def main():
     input_json["umi_bam_tag"] = umi_bam_tag
 
     input_json["star_cpu"] = cpu
-    input_json["variant_filtration_cpu"] = cpu
     input_json["variant_annotation_cpu"] = cpu
     input_json["ref_fasta"] = ref_fasta
     input_json["ref_fasta_index"] = ref_fasta_index
@@ -426,9 +401,6 @@ def main():
 
     input_json["deepvariant_shards"] = deepvariant_shards
     input_json["output_gvcf"] = output_gvcf
-    input_json["deepvariant_min_gq"] = deepvariant_min_gq
-    input_json["deepvariant_min_qual"] = deepvariant_min_qual
-    input_json["deepvariant_min_dp"] = deepvariant_min_dp
     input_json["deepvariant_use_gpu"] = deepvariant_use_gpu
 
     input_json["docker"] = "trinityctat/ctat_mutations:5.0.0"

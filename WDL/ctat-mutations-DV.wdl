@@ -59,7 +59,6 @@ workflow ctat_mutations_DV {
         Boolean annotate_variants = true
 
 
-        Boolean filter_variants = true
         Boolean filter_cancer_variants = true
 		
         Boolean variant_ready_bam = false
@@ -68,7 +67,6 @@ workflow ctat_mutations_DV {
         Boolean mark_duplicates = true
         Boolean add_read_groups = false
 
-        Int variant_filtration_cpu = 1
         Int variant_annotation_cpu = 5
 
         Boolean singlecell_mode = false
@@ -85,10 +83,6 @@ workflow ctat_mutations_DV {
         String deepvariant_docker_gpu = "google/deepvariant:1.10.0-gpu"
         Int deepvariant_shards = 18
         Boolean output_gvcf = false
-        Int deepvariant_min_gq = 18
-        Int deepvariant_min_qual = 20
-        Int deepvariant_min_dp = 5
-
         # annotation options
         Boolean incl_snpEff = true
         Boolean incl_dbsnp = true
@@ -116,7 +110,6 @@ workflow ctat_mutations_DV {
         Float mark_duplicates_memory = 16
         Float split_n_cigar_reads_memory = 32
 
-        Float filter_memory = 10
     }
 
     Boolean vcf_input = defined(vcf)
@@ -169,20 +162,14 @@ workflow ctat_mutations_DV {
         mark_duplicates : {help:"Whether to mark duplicates"}
         filter_cancer_variants:{help:"Whether to generate cancer VCF file"}
         annotate_variants:{help:"Whether to annotate the vcf file"}
-        filter_variants:{help:"Whether to filter VCF file"}
 
         deepvariant_use_gpu:{help:"Use GPU acceleration for DeepVariant (requires GPU-enabled machine on Terra)"}
         deepvariant_shards:{help:"Number of shards for DeepVariant parallelization"}
         output_gvcf:{help:"Output gVCF file in addition to VCF"}
-        deepvariant_min_gq:{help:"Minimum genotype quality (GQ) for DeepVariant filtering. Recommended: 18 for high precision."}
-        deepvariant_min_qual:{help:"Minimum QUAL score for DeepVariant filtering"}
-        deepvariant_min_dp:{help:"Minimum depth (DP) for DeepVariant filtering"}
 
         star_cpu:{help:"STAR aligner number of CPUs"}
         star_memory:{help:"STAR aligner memory"}
         output_unmapped_reads:{help:"Whether to output unmapped reads from STAR"}
-
-        variant_filtration_cpu:{help:"Number of CPUs for variant filtration task"}
         variant_annotation_cpu:{help:"Number of CPUs for variant annotation task"}
         normalize_max_cov_level:{help:"Maximum per-strand coverage level used during BAM normalization"}
 
@@ -486,45 +473,28 @@ workflow ctat_mutations_DV {
 
       }
 
-      if (filter_variants) {
-
-            call FilterDeepVariantVCF {
+      if(filter_cancer_variants) {
+            call FilterCancerVariants {
                 input:
                     input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
-                    input_vcf_index = select_first([AnnotateVariants.vcf_index, variant_vcf_index]),
                     base_name = sample_id + ".deepvariant",
-                    min_gq = deepvariant_min_gq,
-                    min_qual = deepvariant_min_qual,
-                    min_dp = deepvariant_min_dp,
-                    cpu = variant_filtration_cpu,
-                    memory = filter_memory,
+                    scripts_path=scripts_path,
                     docker = docker,
                     preemptible = preemptible
             }
 
-            if(filter_cancer_variants) {
-                call FilterCancerVariants {
+            if(defined(ref_bed)) {
+                call CancerVariantReport {
                     input:
-                        input_vcf = FilterDeepVariantVCF.filtered_vcf,
-                        base_name = sample_id + ".deepvariant",
-                        scripts_path=scripts_path,
+                        input_vcf = FilterCancerVariants.cancer_vcf,
+                        base_name = sample_id,
+                        ref_fasta = ref_fasta,
+                        ref_fasta_index = ref_fasta_index,
+                        ref_bed = select_first([ref_bed]),
+                        bam=select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
+                        bai=select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
                         docker = docker,
                         preemptible = preemptible
-                }
-
-                if(defined(ref_bed)) {
-                    call CancerVariantReport {
-                        input:
-                            input_vcf = FilterCancerVariants.cancer_vcf,
-                            base_name = sample_id,
-                            ref_fasta = ref_fasta,
-                            ref_fasta_index = ref_fasta_index,
-                            ref_bed = select_first([ref_bed]),
-                            bam=select_first([MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam]),
-                            bai=select_first([MarkDuplicates.bai, NormalizeBam.output_bai, StarAlign.bai, mm2.bai, bai]),
-                            docker = docker,
-                            preemptible = preemptible
-                    }
                 }
             }
       }
@@ -532,7 +502,7 @@ workflow ctat_mutations_DV {
       if(singlecell_mode && !filter_ready_vcf) {
             call single_cell_report {
                 input:
-                    input_vcf = select_first([FilterDeepVariantVCF.filtered_vcf, AnnotateVariants.vcf, variant_vcf]),
+                    input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
                     bam = pass_read_eval_bam,
                     bam_index = pass_read_eval_bai,
                     cell_barcode_bam_tag = cell_barcode_bam_tag,
@@ -555,7 +525,6 @@ workflow ctat_mutations_DV {
         File variant_calling_bam = realigned_bam
         File variant_calling_bai = realigned_bai
         File? annotated_vcf = AnnotateVariants.vcf
-        File? filtered_vcf = FilterDeepVariantVCF.filtered_vcf
         File? aligned_bam = StarAlign.bam
         File? aligned_bai = StarAlign.bai
         File? output_log_final =  StarAlign.output_log_final
@@ -1068,50 +1037,6 @@ task DeepVariant_gpu {
         preemptible: preemptible
         gpuType: "nvidia-tesla-t4"
         gpuCount: 1
-    }
-}
-
-
-task FilterDeepVariantVCF {
-    input {
-        File input_vcf
-        File input_vcf_index
-        String base_name
-        Int min_gq = 18  # DeepVariant recommended threshold for high precision
-        Int min_qual = 20
-        Int min_dp = 5
-        Int cpu = 1
-        Float memory = 4
-        String docker
-        Int preemptible
-    }
-
-    command <<<
-        set -ex
-
-        # Apply DeepVariant quality filtering (GQ >= 18 recommended for RNA-seq)
-        # Per research: achieves 0.998 SNP precision, 0.989 INDEL precision
-        bcftools filter \
-            -i 'QUAL>=~{min_qual} && FORMAT/GQ>=~{min_gq} && FORMAT/DP>=~{min_dp}' \
-            -s LowQuality \
-            -O z \
-            -o ~{base_name}.filtered.vcf.gz \
-            ~{input_vcf}
-
-        tabix -p vcf ~{base_name}.filtered.vcf.gz
-    >>>
-
-    output {
-        File filtered_vcf = "~{base_name}.filtered.vcf.gz"
-        File filtered_vcf_index = "~{base_name}.filtered.vcf.gz.tbi"
-    }
-
-    runtime {
-        docker: docker
-        memory: memory + " GB"
-        cpu: cpu
-        disks: "local-disk " + ceil(size(input_vcf, "GB") * 2 + 20) + " HDD"
-        preemptible: preemptible
     }
 }
 

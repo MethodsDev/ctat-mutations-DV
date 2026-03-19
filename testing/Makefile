@@ -37,9 +37,6 @@ DV_long_reads_singlecell:
 DV_with_gvcf:
 	../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_gvcf -O example.DV_gvcf --output_gvcf
 
-DV_custom_thresholds:
-	../ctat-mutations-DV --left reads_1.fastq.gz --right reads_2.fastq.gz --sample_id example.DV_custom -O example.DV_custom --deepvariant_min_gq 30 --deepvariant_min_qual 30 --deepvariant_min_dp 10
-
 ## Docker
 
 DV_standard_docker:
@@ -115,7 +112,6 @@ clean:
 ##
 ## NEW:
 ## - DV_with_gvcf: Test gVCF output
-## - DV_custom_thresholds: Test custom quality thresholds
 ##
 ## For v4.x compatibility testing, use the v4.3.0 Docker image:
 ##   docker pull trinityctat/ctat_mutations:4.3.0
