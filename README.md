@@ -101,6 +101,11 @@ Defaults are `CB` for the cell barcode tag and `XM` for the UMI tag.
 
 ## Installation
 
+### Already Cloud-enabled?
+
+Find our GRCh38 preconfigured workflow on [Dockstore](https://dockstore.org/workflows/github.com/MethodsDev/ctat-mutations-DV/hg38_ctat-mutations-DV:master?tab=info).
+
+    
 ### Using Docker (Easiest)
 
 ```bash
