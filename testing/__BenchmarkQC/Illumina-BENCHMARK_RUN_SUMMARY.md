@@ -1,128 +1,103 @@
-# DeepVariant RNA-seq Benchmark Run Summary
+# Illumina RNA-seq Benchmark Context For Future Codex Runs
 
-This document records the exact execution flow used on March 19, 2026 to benchmark the local `ctat-mutations-DV` workflow on the DeepVariant Illumina RNA-seq case-study data.
+This file is a reusable handoff for future Codex benchmarking work, not just a one-time run log.
 
-## Goal
+It captures the known-good Illumina RNA-seq benchmark setup established on March 19, 2026 for benchmarking the local `ctat-mutations-DV` workflow against the public DeepVariant RNA-seq case study.
 
-Follow the DeepVariant RNA-seq case-study preprocessing and benchmarking steps as closely as practical, but replace the case-study DeepVariant execution command with the local `ctat-mutations-DV` wrapper.
+## Benchmark Intent
 
-## Workspace
+Use this benchmark to compare a new `ctat-mutations-DV` version against a fixed short-read RNA-seq baseline on:
+
+- sample: `HG005`
+- assay: Illumina mRNA RNA-seq
+- model type: DeepVariant `RNASEQ`
+- reference space: `GRCh38`
+- effective evaluation scope: `chr20 CDS` positions with at least `3x` coverage
+
+The benchmark goal is stability testing. For future reruns, change the CTAT checkout or executable under test while keeping inputs, derived BED logic, and scoring method fixed.
+
+## Workspace And Fixed Paths
+
+Original benchmark workspace:
 
 `/home/unix/bhaas/projects/DeepVariantEval/test_illumina`
 
-## CTAT Workflow Used
+CTAT executable used for the baseline:
 
 `/home/unix/bhaas/GITHUB/MDL/ctat-mutations-DV/ctat-mutations-DV`
 
-## Genome Library Used
-
-Environment variable:
+Genome library used for the baseline:
 
 ```bash
 CTAT_GENOME_LIB=/home/unix/bhaas/CTAT_GENOME_LIBS/GRCh38_gencode_v22_CTAT_lib_Mar012021.plug-n-play/ctat_genome_lib_build_dir
 ```
 
-## High-Level Execution Plan
+## Fixed Inputs
 
-1. Create the standard case-study directory layout.
-2. Download the GRCh38 reference used by the case study.
-3. Download GIAB HG005 benchmark truth resources.
-4. Download the Gencode annotation and derive `chr20_CDS.bed`.
-5. Download the HG005 Illumina RNA-seq BAM and BAI.
-6. Run `mosdepth` to produce per-base coverage.
-7. Build the 3x coverage regions and intersect them with chr20 CDS and GIAB benchmark regions.
-8. Run `ctat-mutations-DV` on the BAM restricted to `data/chr20_CDS_3x.bed`.
-9. Benchmark the resulting VCF with `hap.py`.
+These inputs should be treated as frozen benchmark fixtures unless the benchmark itself is being intentionally redesigned.
 
-## Exact Commands Used
-
-### 1. Create directories
+### Reference
 
 ```bash
-mkdir -p data benchmark reference model output happy logs
+reference/GRCh38_no_alt_analysis_set.fasta
+reference/GRCh38_no_alt_analysis_set.fasta.fai
 ```
 
-### 2. Download the case-study reference
+### Truth Set
 
 ```bash
-FTPDIR=https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids
-
-curl -L --fail --retry 3 -C - \
-  "$FTPDIR/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz" | \
-  gunzip > reference/GRCh38_no_alt_analysis_set.fasta
-
-curl -L --fail --retry 3 -C - \
-  -o reference/GRCh38_no_alt_analysis_set.fasta.fai \
-  "$FTPDIR/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.fai"
+benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.bed
+benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi
 ```
 
-### 3. Download GIAB HG005 truth resources
+Source:
 
 ```bash
-GIAB=https://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38
-
-curl -L --fail --retry 3 -C - \
-  -o benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.bed \
-  "$GIAB/HG005_GRCh38_1_22_v4.2.1_benchmark.bed"
-
-curl -L --fail --retry 3 -C - \
-  -o benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz \
-  "$GIAB/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
-
-curl -L --fail --retry 3 -C - \
-  -o benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi \
-  "$GIAB/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi"
+https://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/
 ```
 
-### 4. Download Gencode and derive chr20 CDS regions
+### Annotation-Derived Regions
 
 ```bash
-curl -L --fail --retry 3 -C - \
-  -o data/gencode.v41.basic.annotation.gff3.gz \
-  https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.basic.annotation.gff3.gz
-
-gzip -dc data/gencode.v41.basic.annotation.gff3.gz | \
-awk -v OFS='\t' '$1 == "chr20" && $3 == "CDS" && $4 < $5 { print $1, $4, $5, "CDS" }' | \
-awk '!dup[$0]++' > data/chr20_CDS.bed
+data/gencode.v41.basic.annotation.gff3.gz
+data/chr20_CDS.bed
+data/hg005_3x.bed
+data/chr20_CDS_3x.bed
+benchmark/chr20_CDS_3x.benchmark_regions.bed
 ```
 
-### 5. Download HG005 Illumina RNA-seq BAM
+The evaluation regions are derived from:
+
+- Gencode v41 basic annotation CDS records on `chr20`
+- `mosdepth` per-base coverage filtered at `>= 3x`
+- intersection with the GIAB benchmark BED
+
+### RNA-seq BAM
 
 ```bash
-HTTPDIR=https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam/rna/illumina/mrna
-
-curl -L --fail --retry 3 -C - \
-  -o data/hg005_gm26107.mrna.grch38.bam \
-  "$HTTPDIR/hg005_gm26107.mrna.grch38.bam"
-
-curl -L --fail --retry 3 -C - \
-  -o data/hg005_gm26107.mrna.grch38.bam.bai \
-  "$HTTPDIR/hg005_gm26107.mrna.grch38.bam.bai"
+data/hg005_gm26107.mrna.grch38.bam
+data/hg005_gm26107.mrna.grch38.bam.bai
 ```
 
-### 6. Validate BAM readability
+Source:
 
 ```bash
-samtools quickcheck -v data/hg005_gm26107.mrna.grch38.bam
-samtools idxstats data/hg005_gm26107.mrna.grch38.bam | sed -n '1,15p'
+https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam/rna/illumina/mrna/
 ```
 
-### 7. Generate coverage with `mosdepth`
+## Benchmark Invariants Codex Should Preserve
 
-Containerized `mosdepth` was used because no local `mosdepth` binary was present on `PATH`.
+- Use the supplied HG005 Illumina RNA-seq BAM directly.
+- Keep `--variant_ready_bam` enabled so the benchmark focuses on variant calling rather than CTAT BAM preprocessing.
+- Keep the interval restriction fixed at `data/chr20_CDS_3x.bed`.
+- Score only within `benchmark/chr20_CDS_3x.benchmark_regions.bed`.
+- Keep annotation and cancer-filtering steps disabled so benchmark outputs remain centered on the raw VCF.
+- Future comparisons should write to a fresh output directory instead of overwriting the baseline run.
 
-```bash
-docker run --rm \
-  -v "$(pwd):$(pwd)" \
-  -w "$(pwd)" \
-  quay.io/biocontainers/mosdepth:0.3.1--h4dc83fb_1 \
-  mosdepth \
-    --threads "$(nproc)" \
-    data/hg005_coverage \
-    data/hg005_gm26107.mrna.grch38.bam
-```
+## Region Construction Logic
 
-### 8. Build the 3x evaluation regions
+These derived BEDs are part of the benchmark definition. If they are rebuilt, the exact logic should remain unchanged:
 
 ```bash
 min_coverage=3
@@ -141,21 +116,14 @@ bedtools intersect \
   -b data/chr20_CDS_3x.bed > benchmark/chr20_CDS_3x.benchmark_regions.bed
 ```
 
-### 9. Run `ctat-mutations-DV`
+## Baseline CTAT Run
 
-This is the substitution point for the original DeepVariant case study.
-
-Key choices:
-
-- `--bam`: use the case-study BAM directly.
-- `--variant_ready_bam`: skip CTAT BAM preprocessing and call on the supplied BAM.
-- `--intervals data/chr20_CDS_3x.bed`: match the case-study restricted region set.
-- `--no_annotate_variants --no_cravat --no_filter_cancer_variants`: keep the run focused on the core VCF used for benchmarking.
+This is the known-good CTAT command pattern for Illumina RNA-seq reruns:
 
 ```bash
 export CTAT_GENOME_LIB=/home/unix/bhaas/CTAT_GENOME_LIBS/GRCh38_gencode_v22_CTAT_lib_Mar012021.plug-n-play/ctat_genome_lib_build_dir
 
-/home/unix/bhaas/GITHUB/MDL/ctat-mutations-DV/ctat-mutations-DV \
+/path/to/ctat-mutations-DV \
   --bam data/hg005_gm26107.mrna.grch38.bam \
   --genome_lib_dir "$CTAT_GENOME_LIB" \
   --sample_id HG005 \
@@ -166,25 +134,18 @@ export CTAT_GENOME_LIB=/home/unix/bhaas/CTAT_GENOME_LIBS/GRCh38_gencode_v22_CTAT
   --no_annotate_variants \
   --no_cravat \
   --no_filter_cancer_variants \
-  -O output/ctat_hg005
+  -O output/ctat_hg005_vNEXT
 ```
 
-What CTAT executed internally for the variant-calling step:
+Expected internal DeepVariant mode:
 
 ```bash
-/opt/deepvariant/bin/run_deepvariant \
-  --model_type=RNASEQ \
-  --ref=.../ref_genome.fa \
-  --reads=.../hg005_gm26107.mrna.grch38.bam \
-  --output_vcf=HG005.deepvariant.init.vcf.gz \
-  --sample_name=HG005 \
-  --disable_small_model \
-  --num_shards=16 \
-  --regions=.../chr20_CDS_3x.bed \
-  --intermediate_results_dir=intermediate_results
+--model_type=RNASEQ
 ```
 
-### 10. Benchmark with `hap.py`
+## Baseline Benchmark Command
+
+Use this `hap.py` invocation for future reruns:
 
 ```bash
 docker run --rm \
@@ -193,52 +154,36 @@ docker run --rm \
   jmcdani20/hap.py:v0.3.12 \
   /opt/hap.py/bin/hap.py \
     benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz \
-    output/ctat_hg005/HG005.deepvariant.init.vcf.gz \
+    output/ctat_hg005_vNEXT/HG005.deepvariant.init.vcf.gz \
     -f benchmark/chr20_CDS_3x.benchmark_regions.bed \
     -r reference/GRCh38_no_alt_analysis_set.fasta \
-    -o happy/happy.output \
+    -o happy/happy.output.vNEXT \
     --engine=vcfeval \
     --pass-only \
     --target-regions=data/chr20_CDS_3x.bed \
     --threads="$(nproc)"
 ```
 
-## Resulting Key Files
+## Expected Output Files
 
-### Inputs and derived regions
+### CTAT
 
-- `reference/GRCh38_no_alt_analysis_set.fasta`
-- `reference/GRCh38_no_alt_analysis_set.fasta.fai`
-- `benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.bed`
-- `benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz`
-- `benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi`
-- `data/hg005_gm26107.mrna.grch38.bam`
-- `data/hg005_gm26107.mrna.grch38.bam.bai`
-- `data/chr20_CDS.bed`
-- `data/hg005_3x.bed`
-- `data/chr20_CDS_3x.bed`
-- `benchmark/chr20_CDS_3x.benchmark_regions.bed`
+- `output/ctat_hg005_vNEXT/HG005.deepvariant.init.vcf.gz`
+- `output/ctat_hg005_vNEXT/HG005.deepvariant.init.vcf.gz.tbi`
+- `output/ctat_hg005_vNEXT/HG005.variant-ready.bam`
+- `output/ctat_hg005_vNEXT/HG005.variant-ready.bam.bai`
 
-### CTAT outputs
+### `hap.py`
 
-- `output/ctat_hg005/HG005.deepvariant.init.vcf.gz`
-- `output/ctat_hg005/HG005.deepvariant.init.vcf.gz.tbi`
-- `output/ctat_hg005/HG005.variant-ready.bam`
-- `output/ctat_hg005/HG005.variant-ready.bam.bai`
-- `output/ctat_hg005/cromwell-workflow-logs/`
-- `output/ctat_hg005/cromwell-executions/`
+- `happy/happy.output.vNEXT.summary.csv`
+- `happy/happy.output.vNEXT.extended.csv`
+- `happy/happy.output.vNEXT.metrics.json.gz`
+- `happy/happy.output.vNEXT.vcf.gz`
+- `happy/happy.output.vNEXT.roc.all.csv.gz`
 
-### hap.py outputs
+## Baseline Metrics To Match
 
-- `happy/happy.output.summary.csv`
-- `happy/happy.output.extended.csv`
-- `happy/happy.output.metrics.json.gz`
-- `happy/happy.output.vcf.gz`
-- `happy/happy.output.roc.all.csv.gz`
-
-## Final Benchmark Metrics
-
-From `happy/happy.output.summary.csv`:
+These are the reference metrics from the March 19, 2026 run. Future Codex benchmark work should compare against these values first.
 
 ### SNP
 
@@ -256,58 +201,32 @@ From `happy/happy.output.summary.csv`:
 - Truth TP/FN: `7 / 2`
 - Query FP/UNK: `1 / 5`
 
-## Notes for Re-running With a New `ctat-mutations-DV` Version
+## Success Criteria For Future Reruns
 
-To benchmark a new CTAT version next time, keep everything else the same and only change:
+- The CTAT run completes with `RNASEQ` DeepVariant mode and emits the expected top-level VCF.
+- The run keeps region restriction fixed at `data/chr20_CDS_3x.bed`.
+- `hap.py` completes against `benchmark/chr20_CDS_3x.benchmark_regions.bed`.
+- Metrics remain at or very near the baseline values above unless the tested CTAT change is expected to alter calls.
+- Any metric drift should be reported explicitly as either expected or a regression.
 
-- the CTAT checkout or executable path
-- the output directory name
-- optionally the `sample_id` if you want version-specific filenames
+## Failure Modes Codex Should Check First
 
-Recommended repeat-run pattern:
-
-1. Reuse the existing downloaded inputs and derived BED files.
-2. Point to the new `ctat-mutations-DV` executable.
-3. Write to a fresh output directory such as `output/ctat_hg005_vNEXT`.
-4. Run the same `hap.py` command against that new VCF.
-5. Compare the new `happy.output.summary.csv` against the previous run.
-
-Minimal rerun commands:
-
-```bash
-export CTAT_GENOME_LIB=/home/unix/bhaas/CTAT_GENOME_LIBS/GRCh38_gencode_v22_CTAT_lib_Mar012021.plug-n-play/ctat_genome_lib_build_dir
-
-/path/to/new/ctat-mutations-DV \
-  --bam data/hg005_gm26107.mrna.grch38.bam \
-  --genome_lib_dir "$CTAT_GENOME_LIB" \
-  --sample_id HG005 \
-  --variant_ready_bam \
-  --intervals data/chr20_CDS_3x.bed \
-  --deepvariant_shards "$(nproc)" \
-  --cpu "$(nproc)" \
-  --no_annotate_variants \
-  --no_cravat \
-  --no_filter_cancer_variants \
-  -O output/ctat_hg005_vNEXT
-
-docker run --rm \
-  -v "$(pwd):$(pwd)" \
-  -w "$(pwd)" \
-  jmcdani20/hap.py:v0.3.12 \
-  /opt/hap.py/bin/hap.py \
-    benchmark/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz \
-    output/ctat_hg005_vNEXT/HG005.deepvariant.init.vcf.gz \
-    -f benchmark/chr20_CDS_3x.benchmark_regions.bed \
-    -r reference/GRCh38_no_alt_analysis_set.fasta \
-    -o happy/happy.output.vNEXT \
-    --engine=vcfeval \
-    --pass-only \
-    --target-regions=data/chr20_CDS_3x.bed \
-    --threads="$(nproc)"
-```
+- The interval BED was changed or regenerated with different filtering logic.
+- A benchmark was run against the full GIAB BED instead of `benchmark/chr20_CDS_3x.benchmark_regions.bed`.
+- The wrong VCF path was passed to `hap.py`.
+- Annotation or filtering options were re-enabled and affected the benchmark artifact being compared.
+- A different reference build or genome library was substituted.
 
 ## Operational Notes
 
-- `mosdepth` and `hap.py` outputs were created by Docker and are owned by `root`, but they are readable.
-- The CTAT run used the local Cromwell wrapper successfully and produced symlinked top-level outputs under `output/ctat_hg005/`.
-- The case-study reference and the CTAT genome-lib reference matched on the primary contigs used here, which was sufficient for this restricted benchmark.
+- `mosdepth` was run in a container in the baseline because no host binary was on `PATH`.
+- `hap.py` outputs created by Docker may be owned by `root` depending on how the container is launched.
+- The case-study reference and CTAT genome-lib reference matched sufficiently on the primary contigs used in this restricted benchmark.
+
+## Minimal Codex Handoff Prompt
+
+If future Codex sessions need a compact benchmark brief, this is the minimum context to provide:
+
+```text
+Rerun the HG005 Illumina RNA-seq benchmark for ctat-mutations-DV using the existing fixtures in /home/unix/bhaas/projects/DeepVariantEval/test_illumina. Keep the benchmark definition fixed. Use the HG005 RNA-seq BAM directly with --variant_ready_bam, restrict CTAT calling to data/chr20_CDS_3x.bed, and benchmark the output VCF with hap.py against benchmark/chr20_CDS_3x.benchmark_regions.bed. Compare against the March 19, 2026 baseline: SNP F1 0.968421, INDEL F1 0.823529.
+```
