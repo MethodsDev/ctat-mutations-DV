@@ -1,8 +1,8 @@
 FROM ubuntu:24.04
 
 LABEL maintainer="bhaas@broadinstitute.org"
-LABEL description="CTAT-Mutations v5.0.0 - RNA-seq variant calling with DeepVariant"
-LABEL version="5.0.0"
+LABEL description="CTAT-Mutations-DV - RNA-seq variant calling with DeepVariant"
+
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -158,8 +158,8 @@ ENV PATH=/usr/local/src/ctat-mutations/WDL/:/usr/local/src/ctat-mutations/src/:$
 
 ## MethodsDev CTAT mutations DV
 WORKDIR $SRC
-ENV CTAT_MUTATIONS_VERSION=5.0.3
-ENV CTAT_MUTATIONS_COMMIT=e15950f5fee892a8e946cabeaf2d8d386b0ed1c3
+ENV CTAT_MUTATIONS_VERSION=5.0.4
+ENV CTAT_MUTATIONS_COMMIT=e1fce73d193f15e670717d1d8f5122bc4e648c0e
 
 # Clone from GitHub using specific commit
 RUN git clone --recursive https://github.com/MethodsDev/ctat-mutations-DV.git ctat-mutations && \
