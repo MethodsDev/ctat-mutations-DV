@@ -6,7 +6,10 @@ import logging
 import argparse
 import gzip
 import multiprocessing
+import os
+import tempfile
 import time
+import psutil
 import pysam
 
 
@@ -165,12 +168,30 @@ class VariantReportBuilder:
     def build(self):
         logger.info("\tBuilding single-cell variant report")
         idx_list = chunk_lines(self.variant_lines, self.chunks)
+        total_chunks = len(idx_list)
+        self._total_variants = sum(len(c) for c in idx_list)
+        self.variant_lines = None  # free raw VCF lines — no longer needed
 
-        results = {}
+        self._tmp_path = tempfile.mktemp(suffix=".tsv")
+        tmp_fh = open(self._tmp_path, "w")
+        chunks_done = [0]  # list for mutability inside closure
 
         def logging_return(result):
             chunk_index, chunk_result = result
-            results[chunk_index] = chunk_result
+            for within_idx, (pos_token, reads_w_var, reads_wo_var) in enumerate(chunk_result):
+                tmp_fh.write(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                        chunk_index,
+                        within_idx,
+                        pos_token,
+                        len(reads_w_var),
+                        ",".join(reads_w_var),
+                        len(reads_wo_var),
+                        ",".join(reads_wo_var),
+                    )
+                )
+            tmp_fh.flush()
+            chunks_done[0] += 1
 
         if self.threads > 1:
             pool = multiprocessing.Pool(
@@ -181,6 +202,7 @@ class VariantReportBuilder:
 
             def error_handler(error):
                 logger.error("ERROR_HANDLER - CAUGHT: " + str(error))
+                tmp_fh.close()
                 pool.terminate()
                 pool.join()
                 sys.exit(2)
@@ -203,30 +225,52 @@ class VariantReportBuilder:
 
         if self.threads > 1:
             pool.close()
-            while len(results) < len(idx_list):
-                progress_percent = int(len(results) / len(idx_list) * 100)
-                progress_bar(progress_percent)
+            while chunks_done[0] < total_chunks:
+                progress_percent = int(chunks_done[0] / total_chunks * 100)
+                mem = psutil.virtual_memory()
+                used_gb = mem.used / 1024**3
+                total_gb = mem.total / 1024**3
+                bar = "[{}{}]{} | RAM: {:.1f}/{:.1f} GB ({:.0f}%)".format(
+                    "*" * progress_percent,
+                    " " * (100 - progress_percent),
+                    str(progress_percent) + "%",
+                    used_gb,
+                    total_gb,
+                    mem.percent,
+                )
+                sys.stdout.write("\r" + bar)
+                sys.stdout.flush()
                 time.sleep(2)
-            progress_bar(100)
+            mem = psutil.virtual_memory()
+            used_gb = mem.used / 1024**3
+            total_gb = mem.total / 1024**3
+            sys.stdout.write("\r[{}]100% | RAM: {:.1f}/{:.1f} GB ({:.0f}%)\n".format(
+                "*" * 100, used_gb, total_gb, mem.percent
+            ))
+            sys.stdout.flush()
             pool.join()
         else:
             close_worker_bam_reader()
 
-        self.results = []
-        for chunk_index in range(len(idx_list)):
-            self.results.extend(results[chunk_index])
-
-        if len(self.variant_lines) != len(self.results):
-            raise RuntimeError(
-                "The output report has a different number of variants than the input VCF: actual={} generated={}".format(
-                    len(self.variant_lines), len(self.results)
-                )
-            )
-
+        tmp_fh.close()
         return self
 
     def write_output(self):
-        logger.info("\tWriting output report: {}".format(self.output_file))
+        logger.info("\tSorting and writing output report: {}".format(self.output_file))
+
+        with open(self._tmp_path) as f:
+            lines = f.readlines()
+        os.unlink(self._tmp_path)
+
+        if len(lines) != self._total_variants:
+            raise RuntimeError(
+                "The output report has a different number of variants than the input VCF: actual={} generated={}".format(
+                    self._total_variants, len(lines)
+                )
+            )
+
+        lines.sort(key=lambda l: (int(l.split("\t", 2)[0]), int(l.split("\t", 2)[1])))
+
         with open(self.output_file, "w") as ofh:
             print(
                 "\t".join(
@@ -240,20 +284,9 @@ class VariantReportBuilder:
                 ),
                 file=ofh,
             )
-
-            for pos_token, reads_w_var_list, reads_wo_var_list in self.results:
-                print(
-                    "\t".join(
-                        [
-                            pos_token,
-                            str(len(reads_w_var_list)),
-                            ",".join(reads_w_var_list),
-                            str(len(reads_wo_var_list)),
-                            ",".join(reads_wo_var_list),
-                        ]
-                    ),
-                    file=ofh,
-                )
+            for line in lines:
+                # strip the two leading sort index columns (chunk_index, within_idx)
+                ofh.write(line.split("\t", 2)[2])
 
 
 def main():
