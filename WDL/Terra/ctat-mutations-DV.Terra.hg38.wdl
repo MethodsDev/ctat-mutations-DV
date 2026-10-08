@@ -105,6 +105,8 @@ workflow ctat_mutations_DV_Terra_hg38 {
         # DeepVariant outputs (v5.0.0+)
         File deepvariant_vcf = CM_Terra_wf.deepvariant_vcf
         File deepvariant_vcf_index = CM_Terra_wf.deepvariant_vcf_index
+        File? deepvariant_pass_vcf = CM_Terra_wf.deepvariant_pass_vcf
+        File? deepvariant_pass_vcf_index = CM_Terra_wf.deepvariant_pass_vcf_index
         Array[File]? deepvariant_gvcf = CM_Terra_wf.deepvariant_gvcf
 
         # Variant-ready BAM used for calling

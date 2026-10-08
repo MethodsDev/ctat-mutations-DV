@@ -418,6 +418,20 @@ workflow ctat_mutations_DV {
 
      File variant_vcf = select_first([MergePrimaryAndExtraVCFs.output_vcf, dv_vcf, vcf])
      File variant_vcf_index = select_first([MergePrimaryAndExtraVCFs.output_vcf_index, dv_vcf_index, vcf_index])
+
+     # restrict DeepVariant calls to PASS before annotation (drops RefCall / NoCall / LowQual records)
+     if(!vcf_input) {
+        call FilterPassVariants {
+            input:
+                input_vcf = variant_vcf,
+                base_name = sample_id + ".deepvariant.PASS",
+                docker = docker,
+                preemptible = preemptible
+        }
+     }
+
+     File pass_vcf = select_first([FilterPassVariants.vcf, variant_vcf])
+     File pass_vcf_index = select_first([FilterPassVariants.vcf_index, variant_vcf_index])
      File realigned_bam = select_first([bam_for_variant_calls, bam])
      File realigned_bai = select_first([bai_for_variant_calls, bai])
      File pass_read_eval_bam = select_first([SplitReads.ref_bam, SplitNCigarLongReads.bam, MarkDuplicates.bam, NormalizeBam.output_bam, StarAlign.bam, mm2.bam, bam])
@@ -437,8 +451,8 @@ workflow ctat_mutations_DV {
      if((annotate_variants || singlecell_mode) && !filter_ready_vcf) {
         call VariantAnnotation.annotate_variants_wf as AnnotateVariants {
                 input:
-                    input_vcf = variant_vcf,
-                    input_vcf_index = variant_vcf_index,
+                    input_vcf = pass_vcf,
+                    input_vcf_index = pass_vcf_index,
                     base_name = sample_id + ".deepvariant",
                     cravat_lib_tar_gz = cravat_lib_tar_gz,
                     cravat_lib_dir = cravat_lib_dir,
@@ -476,7 +490,7 @@ workflow ctat_mutations_DV {
       if(filter_cancer_variants) {
             call FilterCancerVariants {
                 input:
-                    input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
+                    input_vcf = select_first([AnnotateVariants.vcf, pass_vcf]),
                     base_name = sample_id + ".deepvariant",
                     scripts_path=scripts_path,
                     docker = docker,
@@ -502,7 +516,7 @@ workflow ctat_mutations_DV {
       if(singlecell_mode && !filter_ready_vcf) {
             call single_cell_report {
                 input:
-                    input_vcf = select_first([AnnotateVariants.vcf, variant_vcf]),
+                    input_vcf = select_first([AnnotateVariants.vcf, pass_vcf]),
                     bam = pass_read_eval_bam,
                     bam_index = pass_read_eval_bai,
                     cell_barcode_bam_tag = cell_barcode_bam_tag,
@@ -519,6 +533,8 @@ workflow ctat_mutations_DV {
     output {
         File deepvariant_vcf = variant_vcf
         File deepvariant_vcf_index = variant_vcf_index
+        File? deepvariant_pass_vcf = FilterPassVariants.vcf
+        File? deepvariant_pass_vcf_index = FilterPassVariants.vcf_index
         Array[File]? deepvariant_gvcf = dv_gvcf_files
         File variant_ready_bam_file = select_first([StageVariantReadyBam.variant_ready_bam, realigned_bam])
         File variant_ready_bai_file = select_first([StageVariantReadyBam.variant_ready_bai, realigned_bai])
@@ -1040,6 +1056,37 @@ task DeepVariant_gpu {
     }
 }
 
+
+task FilterPassVariants {
+    input {
+        File input_vcf
+        String base_name
+        String docker
+        Int preemptible
+        Int disk = ceil((size(input_vcf, "GB") * 2) + 10)
+    }
+
+    command <<<
+        set -ex
+
+        bcftools view -f PASS -O z -o ~{base_name}.vcf.gz ~{input_vcf}
+        tabix -p vcf ~{base_name}.vcf.gz
+
+    >>>
+
+    output {
+        File vcf = "~{base_name}.vcf.gz"
+        File vcf_index = "~{base_name}.vcf.gz.tbi"
+    }
+
+    runtime {
+        disks: "local-disk " + disk + " HDD"
+        docker: docker
+        memory: "2G"
+        preemptible: preemptible
+        cpu: 1
+    }
+}
 
 task MergeVCFs {
     input {
