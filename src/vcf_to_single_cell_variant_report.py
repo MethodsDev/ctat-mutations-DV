@@ -131,7 +131,13 @@ def summarize_variant(vcf_line):
             continue
 
         read_suffix = read.query_sequence[(base_readpos - 1):]
-        if read_suffix.startswith(alt_bases) and variant_type == adjacent_base_type:
+        # With =/X CIGARs a mismatch is its own 1X segment, so the next op is '=' (or N, S); only an adjacent I/D
+        # distinguishes an SNV from an indel anchor base.
+        if variant_type == "M":
+            type_ok = adjacent_base_type not in ("I", "D")
+        else:
+            type_ok = variant_type == adjacent_base_type
+        if read_suffix.startswith(alt_bases) and type_ok:
             reads_with_variant.append(readname)
         elif read_suffix.startswith(ref_bases):
             reads_without_variant.append(readname)
