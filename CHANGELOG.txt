@@ -1,3 +1,9 @@
+# Release 5.0.5 October 8, 2026
+    -single-cell variant report: fixed SNV alt-read detection for alignments with =/X CIGAR operations
+     (alt-supporting reads at SNVs were being dropped; affects all prior single-cell variant reports)
+    -DeepVariant calls are filtered to PASS before annotation (RefCall / NoCall records were carried through
+     annotation and could exhaust memory)
+
 # Release 5.0.3 March 19, 2026
     -streamlined and removed filtervariants
     -benchmarked using deepvariant case studies for illumina and masseq
